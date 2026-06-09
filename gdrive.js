@@ -35,10 +35,55 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initGoogleClient, 500);
 });
 
-// --- Restore Connection Token from Session Storage ---
+// --- Auto-connect to Google Drive (Silent authentication) ---
+function autoConnectGDrive() {
+  if (!settings.googleClientId || settings.googleClientId.trim() === '') return;
+  
+  updateGDriveStatus('connecting');
+  
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: settings.googleClientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error !== undefined) {
+          console.warn('Auto-reconnect failed:', tokenResponse.error);
+          updateGDriveStatus('disconnected');
+          return;
+        }
+        
+        gdriveAccessToken = tokenResponse.access_token;
+        gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
+        
+        localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
+        localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        localStorage.setItem('pulsefit_gdrive_connected', 'true');
+        
+        if (typeof gapi !== 'undefined' && gapi.client) {
+          gapi.client.setToken({ access_token: gdriveAccessToken });
+        }
+        
+        updateGDriveStatus('connected');
+        console.log('Successfully auto-reconnected to Google Drive.');
+      },
+      error_callback: (err) => {
+        console.warn('Auto-reconnect client error:', err);
+        updateGDriveStatus('disconnected');
+      }
+    });
+    
+    // Request access token silently (without prompt='consent')
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (err) {
+    console.warn('Auto-reconnect failed to start:', err);
+    updateGDriveStatus('disconnected');
+  }
+}
+
+// --- Restore Connection Token from Storage ---
 function restoreSessionToken() {
-  const token = sessionStorage.getItem('pulsefit_gdrive_token');
-  const expiry = sessionStorage.getItem('pulsefit_gdrive_token_expires');
+  const token = localStorage.getItem('pulsefit_gdrive_token');
+  const expiry = localStorage.getItem('pulsefit_gdrive_token_expires');
   
   if (token && expiry && parseInt(expiry) > Date.now()) {
     gdriveAccessToken = token;
@@ -52,9 +97,14 @@ function restoreSessionToken() {
     updateGDriveStatus('connected');
   } else {
     // Token expired or not found
-    sessionStorage.removeItem('pulsefit_gdrive_token');
-    sessionStorage.removeItem('pulsefit_gdrive_token_expires');
-    updateGDriveStatus('disconnected');
+    localStorage.removeItem('pulsefit_gdrive_token');
+    localStorage.removeItem('pulsefit_gdrive_token_expires');
+    
+    if (localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+      autoConnectGDrive();
+    } else {
+      updateGDriveStatus('disconnected');
+    }
   }
 }
 
@@ -83,9 +133,10 @@ function connectGoogleDrive() {
         gdriveAccessToken = tokenResponse.access_token;
         gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
         
-        // Save to sessionStorage (valid for browser tab life)
-        sessionStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
-        sessionStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        // Save to localStorage (valid across tab reloads)
+        localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
+        localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        localStorage.setItem('pulsefit_gdrive_connected', 'true');
         
         // Register token with GAPI client
         if (typeof gapi !== 'undefined' && gapi.client) {
@@ -117,10 +168,15 @@ function connectGoogleDrive() {
 function updateGDriveStatus(status) {
   const badge = document.getElementById('gdrive-status-badge');
   const connectBtn = document.getElementById('connect-gdrive-btn');
+  const viewLogBtn = document.getElementById('view-gdrive-log-btn');
   
   if (!badge || !connectBtn) return;
   
   badge.className = `gdrive-status-badge ${status}`;
+  
+  if (viewLogBtn) {
+    viewLogBtn.disabled = (status !== 'connected');
+  }
   
   if (status === 'connected') {
     badge.textContent = 'Connected';
@@ -288,5 +344,77 @@ async function syncWorkoutToDrive(workout) {
   } catch (err) {
     console.error('Google Drive Sync Error:', err);
     return false;
+  }
+}
+
+// --- View current log file contents from Google Drive ---
+async function viewDriveLog() {
+  if (!isGDriveConnected()) {
+    alert('Please connect Google Drive first.');
+    return;
+  }
+  
+  const modal = document.getElementById('log-viewer-modal');
+  const contentEl = document.getElementById('log-viewer-content');
+  if (!modal || !contentEl) return;
+  
+  contentEl.textContent = 'Loading log file from Google Drive...';
+  modal.classList.remove('hidden');
+  
+  try {
+    // Ensure token is registered
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
+    
+    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    console.log(`Searching for PulseFit_Workout_Log.txt in folder '${folderName}'...`);
+    
+    // 1. Find the parent folder
+    const searchFolderResponse = await gapi.client.drive.files.list({
+      q: `name = '${folderName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const folders = searchFolderResponse.result.files;
+    if (!folders || folders.length === 0) {
+      contentEl.textContent = `Error: Folder '${folderName}' not found in your Google Drive. Try saving a workout first to initialize it.`;
+      return;
+    }
+    
+    const folderId = folders[0].id;
+    
+    // 2. Find the file inside the folder
+    const searchFileResponse = await gapi.client.drive.files.list({
+      q: `name = 'PulseFit_Workout_Log.txt' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchFileResponse.result.files;
+    if (!files || files.length === 0) {
+      contentEl.textContent = `No logged workouts found. The file 'PulseFit_Workout_Log.txt' does not exist in your Google Drive yet. Try completing and saving a workout first!`;
+      return;
+    }
+    
+    const fileId = files[0].id;
+    
+    // 3. Fetch the content
+    const fileFetch = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      headers: {
+        'Authorization': `Bearer ${gdriveAccessToken}`
+      }
+    });
+    
+    if (fileFetch.ok) {
+      const logText = await fileFetch.text();
+      contentEl.textContent = logText || '(File is empty)';
+    } else {
+      throw new Error(`Failed to retrieve file media. Status: ${fileFetch.status}`);
+    }
+  } catch (err) {
+    console.error('Error fetching log file:', err);
+    contentEl.textContent = `Failed to retrieve log file from Google Drive.\n\nDetails:\n${err.message || err}`;
   }
 }

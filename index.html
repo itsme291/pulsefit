@@ -347,6 +347,12 @@
               <span class="gdrive-status-badge disconnected" id="gdrive-status-badge">Disconnected</span>
             </div>
             
+            <div class="gdrive-actions-panel margin-top-15" style="display:flex; gap:10px;">
+              <button class="btn btn-outline-secondary btn-sm" id="view-gdrive-log-btn" style="flex-grow:1;" disabled>
+                <i data-lucide="file-text"></i> View Log File
+              </button>
+            </div>
+            
             <button class="btn-secondary-text btn-xs margin-top-15" id="toggle-gdrive-help" style="text-align:left;display:flex;align-items:center;gap:4px;cursor:pointer;">
               <i data-lucide="help-circle" style="width:12px;height:12px;"></i> How to get a Google Client ID?
             </button>
@@ -472,6 +478,19 @@
               <!-- Historical entries listed dynamically -->
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Log Viewer Modal -->
+    <div class="modal-backdrop hidden" id="log-viewer-modal">
+      <div class="modal-card" style="max-width: 600px;">
+        <div class="modal-header">
+          <h3>Google Drive Log File</h3>
+          <button class="modal-close" id="close-log-viewer-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+          <pre id="log-viewer-content" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);"></pre>
         </div>
       </div>
     </div>

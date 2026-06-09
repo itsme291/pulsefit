@@ -240,6 +240,11 @@ function initUI() {
   // Close Modals
   document.getElementById('close-plate-modal').onclick = () => document.getElementById('plate-modal').classList.add('hidden');
   document.getElementById('close-ex-info-modal').onclick = () => document.getElementById('exercise-info-modal').classList.add('hidden');
+  document.getElementById('close-log-viewer-modal').onclick = () => document.getElementById('log-viewer-modal').classList.add('hidden');
+  
+  document.getElementById('view-gdrive-log-btn').addEventListener('click', () => {
+    if (typeof viewDriveLog === 'function') viewDriveLog();
+  });
   
   // Active Workout Buttons
   document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
