@@ -158,6 +158,40 @@ function formatWorkoutForFile(workout) {
   return log;
 }
 
+// --- Get or Create custom sync folder inside Google Drive ---
+async function getOrCreateFolder(folderName) {
+  try {
+    console.log(`Searching for folder '${folderName}'...`);
+    const escapedName = folderName.replace(/'/g, "\\'");
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = '${escapedName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchResponse.result.files;
+    if (files && files.length > 0) {
+      console.log(`Found folder '${folderName}' with ID: ${files[0].id}`);
+      return files[0].id;
+    }
+    
+    console.log(`Folder '${folderName}' not found. Creating it...`);
+    const createResponse = await gapi.client.drive.files.create({
+      resource: {
+        name: folderName,
+        mimeType: 'application/vnd.google-apps.folder'
+      },
+      fields: 'id'
+    });
+    
+    console.log(`Created folder '${folderName}' with ID: ${createResponse.result.id}`);
+    return createResponse.result.id;
+  } catch (err) {
+    console.error(`Error in getOrCreateFolder for '${folderName}':`, err);
+    throw err;
+  }
+}
+
 // --- Sync Workout Log with PulseFit_Workout_Log.txt ---
 async function syncWorkoutToDrive(workout) {
   if (!isGDriveConnected()) {
@@ -166,11 +200,14 @@ async function syncWorkoutToDrive(workout) {
   }
   
   try {
-    console.log('Searching for PulseFit_Workout_Log.txt...');
+    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderId = await getOrCreateFolder(folderName);
     
-    // 1. Search for existing file
+    console.log(`Searching for PulseFit_Workout_Log.txt in folder '${folderName}'...`);
+    
+    // 1. Search for existing file in parent folder
     const searchResponse = await gapi.client.drive.files.list({
-      q: "name = 'PulseFit_Workout_Log.txt' and trashed = false",
+      q: `name = 'PulseFit_Workout_Log.txt' and '${folderId}' in parents and trashed = false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
@@ -180,7 +217,7 @@ async function syncWorkoutToDrive(workout) {
     let fileId = null;
     let fileContent = '';
     
-    if (files.length > 0) {
+    if (files && files.length > 0) {
       // File exists - fetch it and append
       fileId = files[0].id;
       const fileFetch = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
@@ -202,7 +239,8 @@ async function syncWorkoutToDrive(workout) {
       const createResponse = await gapi.client.drive.files.create({
         resource: {
           name: 'PulseFit_Workout_Log.txt',
-          mimeType: 'text/plain'
+          mimeType: 'text/plain',
+          parents: [folderId]
         },
         fields: 'id'
       });
@@ -212,7 +250,7 @@ async function syncWorkoutToDrive(workout) {
       const fileHeader = `PULSEFIT WORKOUT DATABASE\n=========================\nThis document stores your logged workouts. Your Gemini AI Workspace extension reads this file to analyze details.\n\n`;
       fileContent = fileHeader + newLogEntry;
       
-      console.log('Created new PulseFit_Workout_Log.txt file in GDrive...');
+      console.log('Created new PulseFit_Workout_Log.txt file in GDrive folder...');
     }
     
     // 2. Upload/Update the file media content

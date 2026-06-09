@@ -73,6 +73,7 @@ let activeWorkout = null;
 let settings = {
   apiKey: '',
   googleClientId: '',
+  googleFolder: 'PulseFit Workouts',
   weightUnit: 'lbs',
   defaultRest: 90,
   timerSound: true
@@ -212,6 +213,17 @@ function initUI() {
     saveSettings();
     alert('Google Client ID saved!');
   });
+
+  document.getElementById('save-google-folder-btn').addEventListener('click', () => {
+    const folder = document.getElementById('settings-google-folder').value.trim();
+    if (!folder) {
+      alert('Google Drive Folder Name cannot be empty!');
+      return;
+    }
+    settings.googleFolder = folder;
+    saveSettings();
+    alert('Google Drive Folder Name saved!');
+  });
   
   document.getElementById('connect-gdrive-btn').addEventListener('click', () => {
     if (typeof connectGoogleDrive === 'function') connectGoogleDrive();
@@ -262,6 +274,7 @@ function initUI() {
   // Init Settings Fields
   document.getElementById('settings-api-key').value = settings.apiKey;
   document.getElementById('settings-google-client-id').value = settings.googleClientId || '';
+  document.getElementById('settings-google-folder').value = settings.googleFolder || 'PulseFit Workouts';
   if (settings.weightUnit === 'kg') {
     unitLbs.classList.remove('active');
     unitKg.classList.add('active');
