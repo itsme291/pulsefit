@@ -35,51 +35,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(initGoogleClient, 500);
 });
 
-// --- Auto-connect to Google Drive (Silent authentication) ---
-function autoConnectGDrive() {
-  if (!settings.googleClientId || settings.googleClientId.trim() === '') return;
-  
-  updateGDriveStatus('connecting');
-  
-  try {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: settings.googleClientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
-      callback: (tokenResponse) => {
-        if (tokenResponse.error !== undefined) {
-          console.warn('Auto-reconnect failed:', tokenResponse.error);
-          updateGDriveStatus('disconnected');
-          return;
-        }
-        
-        gdriveAccessToken = tokenResponse.access_token;
-        gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
-        
-        localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
-        localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
-        localStorage.setItem('pulsefit_gdrive_connected', 'true');
-        
-        if (typeof gapi !== 'undefined' && gapi.client) {
-          gapi.client.setToken({ access_token: gdriveAccessToken });
-        }
-        
-        updateGDriveStatus('connected');
-        console.log('Successfully auto-reconnected to Google Drive.');
-      },
-      error_callback: (err) => {
-        console.warn('Auto-reconnect client error:', err);
-        updateGDriveStatus('disconnected');
-      }
-    });
-    
-    // Request access token silently (without prompt='consent')
-    tokenClient.requestAccessToken({ prompt: '' });
-  } catch (err) {
-    console.warn('Auto-reconnect failed to start:', err);
-    updateGDriveStatus('disconnected');
-  }
-}
-
 // --- Restore Connection Token from Storage ---
 function restoreSessionToken() {
   const token = localStorage.getItem('pulsefit_gdrive_token');
@@ -99,12 +54,7 @@ function restoreSessionToken() {
     // Token expired or not found
     localStorage.removeItem('pulsefit_gdrive_token');
     localStorage.removeItem('pulsefit_gdrive_token_expires');
-    
-    if (localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
-      autoConnectGDrive();
-    } else {
-      updateGDriveStatus('disconnected');
-    }
+    updateGDriveStatus('disconnected');
   }
 }
 
@@ -182,6 +132,7 @@ function updateGDriveStatus(status) {
     badge.textContent = 'Connected';
     connectBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Reconnect';
     connectBtn.className = 'btn btn-outline-primary btn-sm';
+    connectBtn.disabled = false;
   } else if (status === 'connecting') {
     badge.textContent = 'Connecting...';
     connectBtn.disabled = true;
