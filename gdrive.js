@@ -43,6 +43,12 @@ function restoreSessionToken() {
   if (token && expiry && parseInt(expiry) > Date.now()) {
     gdriveAccessToken = token;
     gdriveTokenExpiry = parseInt(expiry);
+    
+    // Register token with GAPI client
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
+    
     updateGDriveStatus('connected');
   } else {
     // Token expired or not found
@@ -80,6 +86,11 @@ function connectGoogleDrive() {
         // Save to sessionStorage (valid for browser tab life)
         sessionStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
         sessionStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        
+        // Register token with GAPI client
+        if (typeof gapi !== 'undefined' && gapi.client) {
+          gapi.client.setToken({ access_token: gdriveAccessToken });
+        }
         
         updateGDriveStatus('connected');
         alert('Connected to Google Drive! Workouts will now auto-sync.');
@@ -200,6 +211,10 @@ async function syncWorkoutToDrive(workout) {
   }
   
   try {
+    // Ensure token is registered with GAPI client
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
     const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
     const folderId = await getOrCreateFolder(folderName);
     
