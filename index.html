@@ -439,6 +439,60 @@
       </div>
     </div>
     
+    <!-- Plate Calculator Modal -->
+    <div class="modal-backdrop hidden" id="plate-modal">
+      <div class="modal-card" style="max-width: 440px;">
+        <div class="modal-header">
+          <h3>Plate Calculator</h3>
+          <button class="modal-close" id="close-plate-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body" style="gap: 16px;">
+          <div style="text-align: center;">
+            <h2 style="font-size: 32px; font-weight: 700; color: var(--primary);" id="plate-calc-weight-title">135 lbs</h2>
+            <span style="font-size: 13px; color: var(--text-secondary);" id="plate-calc-barbell-desc">45 lb Barbell + 45 lbs per side</span>
+          </div>
+          
+          <div class="barbell-visualizer" style="display: flex; align-items: center; justify-content: center; height: 60px; margin: 15px 0; position: relative;">
+            <div class="barbell-bar" style="width: 90%; height: 8px; background: rgba(255, 255, 255, 0.15); border-radius: 4px; display: flex; justify-content: center; align-items: center; position: relative;">
+              <div style="position: absolute; left: 25%; width: 6px; height: 24px; background: #64748b; border-radius: 2px;"></div>
+              <div style="position: absolute; right: 25%; width: 6px; height: 24px; background: #64748b; border-radius: 2px;"></div>
+              <div id="plate-visuals-left" style="position: absolute; left: 25%; transform: translateX(-100%); display: flex; flex-direction: row-reverse; align-items: center; gap: 2px;"></div>
+              <div id="plate-visuals-right" style="position: absolute; right: 25%; transform: translateX(100%); display: flex; align-items: center; gap: 2px;"></div>
+            </div>
+          </div>
+          
+          <div class="plate-list-container" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 16px;">
+            <h4 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: var(--text-primary);">Plates per side:</h4>
+            <div id="plate-list-output" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Plates listed dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Exercise Info & History Modal -->
+    <div class="modal-backdrop hidden" id="exercise-info-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 id="ex-info-title">Exercise Info</h3>
+          <button class="modal-close" id="close-ex-info-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body" style="gap: 20px;">
+          <div class="ex-info-section">
+            <span class="settings-label" style="display: block; margin-bottom: 4px;">Routine Note / Cues</span>
+            <p id="ex-info-notes" style="font-size: 14px; color: var(--text-secondary); font-style: italic; background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: var(--radius-sm); border-left: 3px solid var(--primary);"></p>
+          </div>
+          <div class="ex-info-section">
+            <span class="settings-label" style="display: block; margin-bottom: 8px;">Exercise History Logs</span>
+            <div id="ex-info-history-list" style="display: flex; flex-direction: column; gap: 8px; max-height: 300px; overflow-y: auto; padding-right: 4px;">
+              <!-- Historical entries listed dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </body>
 </html>

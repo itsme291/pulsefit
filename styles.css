@@ -2001,3 +2001,208 @@ body {
 .gdrive-help-content a:hover {
   text-decoration: underline;
 }
+
+/* ==========================================================================
+   Hevy Features & Routine Starters Styles
+   ========================================================================== */
+
+/* Set Type Badges */
+.set-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  user-select: none;
+  transition: var(--transition-fast);
+  border: 1px solid transparent;
+}
+
+.set-badge.normal {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-secondary);
+}
+
+.set-badge.normal:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.set-badge.warmup {
+  background-color: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--warning);
+  text-shadow: 0 0 6px rgba(245, 158, 11, 0.3);
+}
+
+.set-badge.warmup:hover {
+  background-color: rgba(245, 158, 11, 0.25);
+}
+
+.set-badge.drop {
+  background-color: rgba(139, 92, 246, 0.15);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+  text-shadow: 0 0 6px rgba(139, 92, 246, 0.3);
+}
+
+.set-badge.drop:hover {
+  background-color: rgba(139, 92, 246, 0.25);
+}
+
+.set-badge.failure {
+  background-color: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.3);
+}
+
+.set-badge.failure:hover {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+/* Exercise Header Helpers */
+.logger-exercise-notes {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  background-color: rgba(255, 255, 255, 0.01);
+  border-left: 2px solid var(--primary);
+  padding-left: 8px;
+  line-height: 1.4;
+}
+
+.logger-exercise-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.logger-exercise-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.logger-exercise-meta-item i {
+  width: 12px;
+  height: 12px;
+}
+
+.logger-exercise-meta-item.btn-action {
+  cursor: pointer;
+  transition: var(--transition-fast);
+  color: var(--text-secondary);
+}
+
+.logger-exercise-meta-item.btn-action:hover {
+  color: var(--text-primary);
+  background-color: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.2);
+}
+
+/* Barbell plate calculator visualization elements */
+.barbell-visualizer {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.barbell-plate {
+  border-radius: 3px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  color: #fff;
+  user-select: none;
+}
+
+/* Plate Colors (LBS/KG Harmonious colors) */
+/* LBS Plates */
+.plate-lb-45 { height: 46px; width: 10px; background: #ef4444; border: 1px solid #fca5a5; } /* Red */
+.plate-lb-35 { height: 42px; width: 9px; background: #3b82f6; border: 1px solid #93c5fd; } /* Blue */
+.plate-lb-25 { height: 38px; width: 8px; background: #eab308; border: 1px solid #fde047; } /* Yellow */
+.plate-lb-10 { height: 32px; width: 7px; background: #10b981; border: 1px solid #6ee7b7; } /* Green */
+.plate-lb-5  { height: 26px; width: 6px; background: #6b7280; border: 1px solid #d1d5db; } /* Gray */
+.plate-lb-2\.5 { height: 20px; width: 5px; background: #4b5563; border: 1px solid #9ca3af; } /* Dark Gray */
+
+/* KG Plates */
+.plate-kg-25 { height: 46px; width: 10px; background: #ef4444; border: 1px solid #fca5a5; } /* Red */
+.plate-kg-20 { height: 44px; width: 9px; background: #3b82f6; border: 1px solid #93c5fd; } /* Blue */
+.plate-kg-15 { height: 40px; width: 8px; background: #eab308; border: 1px solid #fde047; } /* Yellow */
+.plate-kg-10 { height: 34px; width: 7px; background: #10b981; border: 1px solid #6ee7b7; } /* Green */
+.plate-kg-5  { height: 28px; width: 6px; background: #6b7280; border: 1px solid #d1d5db; } /* Gray */
+.plate-kg-2\.5 { height: 22px; width: 5px; background: #4b5563; border: 1px solid #9ca3af; } /* Dark Gray */
+.plate-kg-1\.25 { height: 18px; width: 4px; background: #374151; border: 1px solid #6b7280; } /* Darker Gray */
+
+/* Plate list display items */
+.plate-list-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background-color: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  font-size: 13px;
+}
+
+.plate-list-row-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plate-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-round);
+}
+
+.plate-quantity-pill {
+  font-weight: 700;
+  background-color: var(--primary);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+/* History entries inside Info modal */
+.info-history-entry {
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.info-history-entry-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.info-history-entry-sets {
+  font-size: 13px;
+  color: var(--text-primary);
+}

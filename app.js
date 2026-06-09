@@ -2,67 +2,66 @@
 // PulseFit - Core Application & Workout Logging State Management
 // ==========================================================================
 
-// --- Default Exercise Database ---
+// // --- Default Exercise Database ---
 const DEFAULT_EXERCISES = [
-  // Chest
-  { id: 'bench-press-barbell', name: 'Bench Press (Barbell)', category: 'Chest' },
-  { id: 'incline-bench-press-barbell', name: 'Incline Bench Press (Barbell)', category: 'Chest' },
-  { id: 'chest-fly-dumbbell', name: 'Chest Fly (Dumbbell)', category: 'Chest' },
-  { id: 'pushups', name: 'Pushups', category: 'Chest' },
-  // Back
-  { id: 'pullups', name: 'Pullups', category: 'Back' },
-  { id: 'barbell-row', name: 'Barbell Row', category: 'Back' },
-  { id: 'lat-pulldown', name: 'Lat Pulldown', category: 'Back' },
-  { id: 'deadlift-barbell', name: 'Deadlift (Barbell)', category: 'Back' },
-  // Legs
-  { id: 'squat-barbell', name: 'Squat (Barbell)', category: 'Legs' },
-  { id: 'leg-press', name: 'Leg Press', category: 'Legs' },
-  { id: 'leg-extension', name: 'Leg Extension', category: 'Legs' },
-  { id: 'lying-leg-curl', name: 'Lying Leg Curl', category: 'Legs' },
-  // Shoulders
-  { id: 'overhead-press-barbell', name: 'Overhead Press (Barbell)', category: 'Shoulders' },
-  { id: 'lateral-raise-dumbbell', name: 'Lateral Raise (Dumbbell)', category: 'Shoulders' },
-  { id: 'face-pulls', name: 'Face Pulls', category: 'Shoulders' },
-  // Arms
-  { id: 'bicep-curl-dumbbell', name: 'Bicep Curl (Dumbbell)', category: 'Arms' },
-  { id: 'tricep-pushdown', name: 'Tricep Pushdown', category: 'Arms' },
-  { id: 'hammer-curl-dumbbell', name: 'Hammer Curl (Dumbbell)', category: 'Arms' },
-  // Core
-  { id: 'plank', name: 'Plank', category: 'Core' },
-  { id: 'hanging-leg-raise', name: 'Hanging Leg Raise', category: 'Core' },
-  { id: 'crunches', name: 'Crunches', category: 'Core' }
+  { id: 'incline-chest-press-machine', name: 'Incline Chest Press (Machine)', category: 'Chest' },
+  { id: 'shoulder-press-dumbbell', name: 'Shoulder Press (Dumbbell)', category: 'Shoulders' },
+  { id: 'lateral-raise-machine', name: 'Lateral Raise (Machine)', category: 'Shoulders' },
+  { id: 'triceps-rope-pushdown', name: 'Triceps Rope Pushdown', category: 'Arms' },
+  { id: 'butterfly-pec-deck', name: 'Butterfly (Pec Deck)', category: 'Chest' },
+  { id: 'skullcrusher-dumbbell', name: 'Skullcrusher (Dumbbell)', category: 'Arms' },
+  { id: 'seated-row-machine', name: 'Seated Row (Machine)', category: 'Back' },
+  { id: 'lat-pulldown-cable', name: 'Lat Pulldown (Cable)', category: 'Back' },
+  { id: 'straight-arm-lat-pulldown-cable', name: 'Straight Arm Lat Pulldown (Cable)', category: 'Back' },
+  { id: 'preacher-curl-machine', name: 'Preacher Curl (Machine)', category: 'Arms' },
+  { id: 'rear-delt-reverse-fly-machine', name: 'Rear Delt Reverse Fly (Machine)', category: 'Shoulders' },
+  { id: 'seated-incline-curl-dumbbell', name: 'Seated Incline Curl (Dumbbell)', category: 'Arms' },
+  { id: 'bulgarian-split-squat', name: 'Bulgarian Split Squat', category: 'Legs' },
+  { id: 'leg-press-horizontal-machine', name: 'Leg Press Horizontal (Machine)', category: 'Legs' },
+  { id: 'leg-extension-machine', name: 'Leg Extension (Machine)', category: 'Legs' },
+  { id: 'seated-leg-curl-machine', name: 'Seated Leg Curl (Machine)', category: 'Legs' },
+  { id: 'seated-calf-raise', name: 'Seated Calf Raise', category: 'Legs' },
+  { id: 'hip-abduction-machine', name: 'Hip Abduction (Machine)', category: 'Legs' },
+  { id: 'hip-adduction-machine', name: 'Hip Adduction (Machine)', category: 'Legs' }
 ];
 
 // --- Templates ---
 const ROUTINE_TEMPLATES = {
   push: {
-    name: 'Push Day',
-    notes: 'Focus on chest, shoulders, and triceps.',
+    name: 'Day 1-push',
+    notes: 'Chest, shoulders, and triceps focus.',
     exercises: [
-      { id: 'bench-press-barbell', sets: [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }] },
-      { id: 'overhead-press-barbell', sets: [{ weight: 95, reps: 8 }, { weight: 95, reps: 8 }, { weight: 95, reps: 8 }] },
-      { id: 'chest-fly-dumbbell', sets: [{ weight: 30, reps: 12 }, { weight: 30, reps: 12 }] },
-      { id: 'tricep-pushdown', sets: [{ weight: 50, reps: 12 }, { weight: 50, reps: 12 }, { weight: 50, reps: 12 }] }
+      { id: 'incline-chest-press-machine', restTime: 150, notes: '4 sets x 6-8 reps. Press lower back flat into pad. Maximize weight.', sets: [{ weight: 100, reps: 6, type: 'normal' }, { weight: 100, reps: 6, type: 'normal' }, { weight: 100, reps: 6, type: 'normal' }, { weight: 100, reps: 6, type: 'normal' }] },
+      { id: 'shoulder-press-dumbbell', restTime: 120, notes: '3 sets x 8-10 reps. Set the bench to an 80-degree incline. Lock your core.', sets: [{ weight: 40, reps: 9, type: 'normal' }, { weight: 40, reps: 9, type: 'normal' }, { weight: 40, reps: 9, type: 'normal' }] },
+      { id: 'lateral-raise-machine', restTime: 60, notes: '3 sets x 12-15 reps. Keep your torso perfectly vertical.', sets: [{ weight: 50, reps: 12, type: 'normal' }, { weight: 50, reps: 12, type: 'normal' }, { weight: 50, reps: 12, type: 'normal' }] },
+      { id: 'triceps-rope-pushdown', restTime: 60, notes: '3 sets x 10-12 reps. Stand upright. Keep elbows glued to your ribs.', sets: [{ weight: 60, reps: 10, type: 'normal' }, { weight: 60, reps: 10, type: 'normal' }, { weight: 60, reps: 10, type: 'normal' }] },
+      { id: 'butterfly-pec-deck', restTime: 60, notes: '3 sets x 12-15 reps. Keep your back flat against the seat.', sets: [{ weight: 80, reps: 12, type: 'normal' }, { weight: 80, reps: 12, type: 'normal' }, { weight: 80, reps: 12, type: 'normal' }] },
+      { id: 'skullcrusher-dumbbell', restTime: 60, notes: '3 sets x 10-12 reps. Feet flat on the bench. Use the knee kick-back to set up and the leg rock-up to sit up. No lifting from the floor.', sets: [{ weight: 30, reps: 10, type: 'normal' }, { weight: 30, reps: 10, type: 'normal' }, { weight: 30, reps: 10, type: 'normal' }] }
     ]
   },
   pull: {
-    name: 'Pull Day',
-    notes: 'Focus on back, biceps, and rear delts.',
+    name: 'Day 2-Pull',
+    notes: 'Back, rear delts, and biceps focus.',
     exercises: [
-      { id: 'pullups', sets: [{ weight: 0, reps: 8 }, { weight: 0, reps: 8 }, { weight: 0, reps: 6 }] },
-      { id: 'barbell-row', sets: [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }] },
-      { id: 'lat-pulldown', sets: [{ weight: 120, reps: 10 }, { weight: 120, reps: 10 }] },
-      { id: 'bicep-curl-dumbbell', sets: [{ weight: 25, reps: 12 }, { weight: 25, reps: 12 }, { weight: 25, reps: 10 }] }
+      { id: 'seated-row-machine', restTime: 150, notes: '3 sets x 6-8 reps. Your chest never leaves the pad.', sets: [{ weight: 120, reps: 7, type: 'normal' }, { weight: 120, reps: 7, type: 'normal' }, { weight: 120, reps: 7, type: 'normal' }] },
+      { id: 'lat-pulldown-cable', restTime: 120, notes: '3 sets x 8-10 reps. Sit vertically. Lock your knees tight under the pads.', sets: [{ weight: 110, reps: 9, type: 'normal' }, { weight: 110, reps: 9, type: 'normal' }, { weight: 110, reps: 9, type: 'normal' }] },
+      { id: 'straight-arm-lat-pulldown-cable', restTime: 60, notes: '3 sets x 12-15 reps. Stand with a slight, rigid hinge at the hips. Keep your arms straight and pull the bar down to your thighs. This isolates the lats to enhance the V-taper without loading the lower back.', sets: [{ weight: 50, reps: 13, type: 'normal' }, { weight: 50, reps: 13, type: 'normal' }, { weight: 50, reps: 13, type: 'normal' }] },
+      { id: 'preacher-curl-machine', restTime: 60, notes: '3 sets x 10-12 reps. Triceps flat on the pad. No torso swinging.', sets: [{ weight: 50, reps: 10, type: 'normal' }, { weight: 50, reps: 10, type: 'normal' }, { weight: 50, reps: 10, type: 'normal' }] },
+      { id: 'rear-delt-reverse-fly-machine', restTime: 60, notes: '3 sets x 12-15 reps. Chest glued to the pad.', sets: [{ weight: 70, reps: 12, type: 'normal' }, { weight: 70, reps: 12, type: 'normal' }, { weight: 70, reps: 12, type: 'normal' }] },
+      { id: 'seated-incline-curl-dumbbell', restTime: 60, notes: '3 sets x 10-12 reps. Set a bench to a 60-degree angle. Lie back so your spine is 100% supported by the pad.', sets: [{ weight: 25, reps: 10, type: 'normal' }, { weight: 25, reps: 10, type: 'normal' }, { weight: 25, reps: 10, type: 'normal' }] }
     ]
   },
   legs: {
-    name: 'Leg Day',
-    notes: 'Quad and hamstring dominant leg day.',
+    name: 'Day 3-Legs',
+    notes: 'Quad and hamstring dominant leg routine.',
     exercises: [
-      { id: 'squat-barbell', sets: [{ weight: 185, reps: 8 }, { weight: 185, reps: 8 }, { weight: 185, reps: 8 }] },
-      { id: 'leg-press', sets: [{ weight: 270, reps: 10 }, { weight: 270, reps: 10 }] },
-      { id: 'lying-leg-curl', sets: [{ weight: 80, reps: 12 }, { weight: 80, reps: 12 }, { weight: 80, reps: 12 }] },
-      { id: 'hanging-leg-raise', sets: [{ weight: 0, reps: 15 }, { weight: 0, reps: 15 }] }
+      { id: 'bulgarian-split-squat', restTime: 105, notes: '3 sets x 6-8 reps per leg. Hold dumbbells at your sides. Drop straight down. Keep your torso upright.', sets: [{ weight: 30, reps: 7, type: 'normal' }, { weight: 30, reps: 7, type: 'normal' }, { weight: 30, reps: 7, type: 'normal' }] },
+      { id: 'leg-press-horizontal-machine', restTime: 120, notes: '3 sets x 10-12 reps.', sets: [{ weight: 200, reps: 10, type: 'normal' }, { weight: 200, reps: 10, type: 'normal' }, { weight: 200, reps: 10, type: 'normal' }] },
+      { id: 'leg-extension-machine', restTime: 60, notes: '3 sets x 12-15 reps. Lower back flat against the seat. Hold the top contraction for 2 seconds. (Execute a 30% weight reduction drop-set to failure immediately at the end of the 3rd set.)', sets: [{ weight: 100, reps: 12, type: 'normal' }, { weight: 100, reps: 12, type: 'normal' }, { weight: 100, reps: 12, type: 'normal' }] },
+      { id: 'seated-leg-curl-machine', restTime: 60, notes: '3 sets x 12-15 reps. Stick to seated. (Execute a 30% weight reduction drop-set to failure immediately at the end of the 3rd set.)', sets: [{ weight: 90, reps: 12, type: 'normal' }, { weight: 90, reps: 12, type: 'normal' }, { weight: 90, reps: 12, type: 'normal' }] },
+      { id: 'seated-calf-raise', restTime: 60, notes: '3 sets x 15-20 reps. No standing calf raises to avoid vertical spinal compression.', sets: [{ weight: 45, reps: 10, type: 'normal' }, { weight: 45, reps: 10, type: 'normal' }, { weight: 45, reps: 10, type: 'normal' }] },
+      { id: 'hip-abduction-machine', restTime: 60, notes: '3 sets x 15 reps. Sit upright and press your knees outward.', sets: [{ weight: 100, reps: 14, type: 'normal' }, { weight: 100, reps: 14, type: 'normal' }, { weight: 100, reps: 14, type: 'normal' }] },
+      { id: 'hip-adduction-machine', restTime: 60, notes: '3 sets x 15 reps. Press the knees inward.', sets: [{ weight: 100, reps: 12, type: 'normal' }, { weight: 100, reps: 12, type: 'normal' }, { weight: 100, reps: 12, type: 'normal' }] }
     ]
   }
 };
@@ -222,6 +221,10 @@ function initUI() {
     const help = document.getElementById('gdrive-help-content');
     help.classList.toggle('hidden');
   });
+  
+  // Close Modals
+  document.getElementById('close-plate-modal').onclick = () => document.getElementById('plate-modal').classList.add('hidden');
+  document.getElementById('close-ex-info-modal').onclick = () => document.getElementById('exercise-info-modal').classList.add('hidden');
   
   // Active Workout Buttons
   document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
@@ -457,10 +460,13 @@ function startWorkout(templateId = null) {
         id: te.id,
         name: dbExercise ? dbExercise.name : te.id,
         category: dbExercise ? dbExercise.category : 'Other',
+        restTime: te.restTime || 90, // Map routine rest time
+        notes: te.notes || '',       // Map routine notes
         sets: te.sets.map((s, index) => ({
           weight: s.weight,
           reps: s.reps,
-          completed: false
+          completed: false,
+          type: s.type || 'normal'   // Map type (normal/warmup/etc)
         }))
       };
     });
@@ -552,6 +558,29 @@ function renderActiveWorkoutExercises() {
   activeWorkout.exercises.forEach((ex, exIndex) => {
     const card = document.createElement('div');
     card.className = 'logger-exercise-card';
+    
+    const notesHTML = ex.notes ? `<div class="logger-exercise-notes">${ex.notes}</div>` : '';
+    const restTimeFormatted = ex.restTime 
+      ? `${Math.floor(ex.restTime / 60)}m ${ex.restTime % 60}s`
+      : `${Math.floor(settings.defaultRest / 60)}m ${settings.defaultRest % 60}s`;
+      
+    const metaHTML = `
+      <div class="logger-exercise-meta">
+        <div class="logger-exercise-meta-item">
+          <i data-lucide="timer"></i>
+          <span>Rest: ${restTimeFormatted}</span>
+        </div>
+        <div class="logger-exercise-meta-item btn-action" onclick="openPlateCalcForExercise(${exIndex})">
+          <i data-lucide="calculator"></i>
+          <span>Plate Calc</span>
+        </div>
+        <div class="logger-exercise-meta-item btn-action" onclick="openExerciseHistory('${ex.id}', '${ex.name}', \`${ex.notes || ''}\`)">
+          <i data-lucide="history"></i>
+          <span>History & Guides</span>
+        </div>
+      </div>
+    `;
+    
     card.innerHTML = `
       <div class="logger-exercise-header">
         <div class="logger-exercise-title">
@@ -562,15 +591,17 @@ function renderActiveWorkoutExercises() {
           <i data-lucide="trash-2"></i>
         </button>
       </div>
+      ${notesHTML}
+      ${metaHTML}
       
-      <table class="set-table">
+      <table class="set-table" style="margin-top: 10px;">
         <thead>
           <tr>
-            <th width="8%" class="center">Set</th>
-            <th width="32%">Previous</th>
-            <th width="24%" class="center">${settings.weightUnit}</th>
-            <th width="24%" class="center">Reps</th>
-            <th width="12%" class="center">Done</th>
+            <th width="10%" class="center">Set</th>
+            <th width="30%">Previous</th>
+            <th width="26%" class="center">${settings.weightUnit}</th>
+            <th width="22%" class="center">Reps</th>
+            <th width="8%" class="center">Done</th>
           </tr>
         </thead>
         <tbody id="exercise-${exIndex}-sets">
@@ -598,14 +629,23 @@ function renderActiveWorkoutExercises() {
       const setRow = document.createElement('tr');
       setRow.className = `set-row ${set.completed ? 'completed-row' : ''}`;
       setRow.innerHTML = `
-        <td class="center"><span class="set-number-label">${setIndex + 1}</span></td>
+        <td class="center">
+          <button class="set-badge ${set.type || 'normal'}" onclick="cycleSetType(${exIndex}, ${setIndex})" title="Click to change set type">
+            ${getSetTypeChar(set.type || 'normal', setIndex + 1)}
+          </button>
+        </td>
         <td><span class="set-prev-label">${prevText}</span></td>
         <td class="center">
-          <input type="number" step="any" class="set-input weight-input" 
-            value="${set.weight !== null ? set.weight : ''}" 
-            placeholder="0"
-            onchange="updateSetData(${exIndex}, ${setIndex}, 'weight', this.value)"
-            ${set.completed ? 'disabled' : ''}>
+          <div style="display:inline-flex; align-items:center; gap:4px;">
+            <input type="number" step="any" class="set-input weight-input" 
+              value="${set.weight !== null ? set.weight : ''}" 
+              placeholder="0"
+              onchange="updateSetData(${exIndex}, ${setIndex}, 'weight', this.value)"
+              ${set.completed ? 'disabled' : ''} style="width: 58px;">
+            <button class="btn-timer-ctrl" onclick="openPlateCalcForWeight(${set.weight || 0})" style="padding:4px; width:22px; height:22px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,0.03);" title="Plate Calculator" ${set.completed ? 'disabled' : ''}>
+              <i data-lucide="calculator" style="width:10px; height:10px;"></i>
+            </button>
+          </div>
         </td>
         <td class="center">
           <input type="number" class="set-input reps-input" 
@@ -680,7 +720,8 @@ function removeSetFromActiveExercise(exIndex, setIndex) {
 }
 
 function toggleSetCompletion(exIndex, setIndex) {
-  const set = activeWorkout.exercises[exIndex].sets[setIndex];
+  const ex = activeWorkout.exercises[exIndex];
+  const set = ex.sets[setIndex];
   set.completed = !set.completed;
   
   saveActiveWorkoutState();
@@ -692,7 +733,8 @@ function toggleSetCompletion(exIndex, setIndex) {
     if (set.weight === null) set.weight = 0;
     if (set.reps === null) set.reps = 0;
     
-    startRestTimer(settings.defaultRest);
+    const restSeconds = ex.restTime !== undefined ? ex.restTime : settings.defaultRest;
+    startRestTimer(restSeconds);
   }
 }
 
@@ -1285,4 +1327,185 @@ function generateAnalyticsInsights(dataPoints, exerciseName, metricLabel) {
   `;
   
   lucide.createIcons();
+}
+
+// ==========================================================================
+// Hevy Features Helpers (Set Types, Plate Calculator, Exercise History Modal)
+// ==========================================================================
+
+function getSetTypeChar(type, index) {
+  if (type === 'warmup') return 'W';
+  if (type === 'drop') return 'D';
+  if (type === 'failure') return 'F';
+  return index;
+}
+
+function cycleSetType(exIndex, setIndex) {
+  const set = activeWorkout.exercises[exIndex].sets[setIndex];
+  const types = ['normal', 'warmup', 'drop', 'failure'];
+  const currentIdx = types.indexOf(set.type || 'normal');
+  const nextIdx = (currentIdx + 1) % types.length;
+  set.type = types[nextIdx];
+  
+  saveActiveWorkoutState();
+  renderActiveWorkoutExercises();
+}
+
+// Open Plate Calculator for specific exercise card (highest logged weight in sets)
+function openPlateCalcForExercise(exIndex) {
+  const ex = activeWorkout.exercises[exIndex];
+  const weights = ex.sets.map(s => s.weight || 0);
+  const maxWeight = Math.max(...weights, 0);
+  openPlateCalcForWeight(maxWeight);
+}
+
+// Plate calculator engine
+function openPlateCalcForWeight(targetWeight) {
+  const modal = document.getElementById('plate-modal');
+  const weightTitle = document.getElementById('plate-calc-weight-title');
+  const barbellDesc = document.getElementById('plate-calc-barbell-desc');
+  const leftVisuals = document.getElementById('plate-visuals-left');
+  const rightVisuals = document.getElementById('plate-visuals-right');
+  const listOutput = document.getElementById('plate-list-output');
+  
+  modal.classList.remove('hidden');
+  weightTitle.textContent = `${targetWeight} ${settings.weightUnit}`;
+  
+  // Barbell weight (standard: 45 lbs or 20 kg)
+  const barWeight = settings.weightUnit === 'lbs' ? 45 : 20;
+  barbellDesc.textContent = `${barWeight} ${settings.weightUnit} Barbell + ${((targetWeight - barWeight) / 2).toFixed(1)} ${settings.weightUnit} per side`;
+  
+  // Reset visuals and lists
+  leftVisuals.innerHTML = '';
+  rightVisuals.innerHTML = '';
+  listOutput.innerHTML = '';
+  
+  const weightPerSide = (targetWeight - barWeight) / 2;
+  if (weightPerSide <= 0) {
+    listOutput.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;">No plates required.</p>';
+    return;
+  }
+  
+  // Standard plates available
+  const lbsPlates = [45, 35, 25, 10, 5, 2.5];
+  const kgPlates = [25, 20, 15, 10, 5, 2.5, 1.25];
+  const platesConfig = settings.weightUnit === 'lbs' ? lbsPlates : kgPlates;
+  
+  let remainingWeight = weightPerSide;
+  const calculatedPlates = {};
+  
+  platesConfig.forEach(plate => {
+    const qty = Math.floor(remainingWeight / plate);
+    if (qty > 0) {
+      calculatedPlates[plate] = qty;
+      remainingWeight = remainingWeight % plate;
+    }
+  });
+  
+  const calculatedKeys = Object.keys(calculatedPlates).map(Number).sort((a, b) => b - a);
+  
+  if (calculatedKeys.length === 0) {
+    listOutput.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;">No plates matching configuration.</p>';
+    return;
+  }
+  
+  // Render list and visuals
+  calculatedKeys.forEach(plateSize => {
+    const qty = calculatedPlates[plateSize];
+    
+    // Add row to list
+    const row = document.createElement('div');
+    row.className = 'plate-list-row';
+    
+    // Plate color mapping
+    let colorDot = '#6b7280';
+    if (settings.weightUnit === 'lbs') {
+      if (plateSize === 45) colorDot = '#ef4444';
+      else if (plateSize === 35) colorDot = '#3b82f6';
+      else if (plateSize === 25) colorDot = '#eab308';
+      else if (plateSize === 10) colorDot = '#10b981';
+    } else {
+      if (plateSize === 25) colorDot = '#ef4444';
+      else if (plateSize === 20) colorDot = '#3b82f6';
+      else if (plateSize === 15) colorDot = '#eab308';
+      else if (plateSize === 10) colorDot = '#10b981';
+    }
+    
+    row.innerHTML = `
+      <div class="plate-list-row-left">
+        <span class="plate-color-dot" style="background-color:${colorDot};"></span>
+        <span style="font-weight:600;">${plateSize} ${settings.weightUnit}</span>
+      </div>
+      <span class="plate-quantity-pill">x${qty}</span>
+    `;
+    listOutput.appendChild(row);
+    
+    // Add visual plates to barbell (replace dot in CSS with dash)
+    const sizeStr = plateSize.toString().replace('.', '-');
+    for (let i = 0; i < qty; i++) {
+      const visualLeftPlate = document.createElement('div');
+      visualLeftPlate.className = `barbell-plate plate-${settings.weightUnit}-${sizeStr}`;
+      visualLeftPlate.textContent = plateSize;
+      leftVisuals.appendChild(visualLeftPlate);
+      
+      const visualRightPlate = document.createElement('div');
+      visualRightPlate.className = `barbell-plate plate-${settings.weightUnit}-${sizeStr}`;
+      visualRightPlate.textContent = plateSize;
+      rightVisuals.appendChild(visualRightPlate);
+    }
+  });
+}
+
+// Exercise history popup in active session
+function openExerciseHistory(exerciseId, exerciseName, routineNotes) {
+  const modal = document.getElementById('exercise-info-modal');
+  const title = document.getElementById('ex-info-title');
+  const notes = document.getElementById('ex-info-notes');
+  const list = document.getElementById('ex-info-history-list');
+  
+  modal.classList.remove('hidden');
+  title.textContent = exerciseName;
+  notes.textContent = routineNotes || 'No specific cues configured for this routine.';
+  list.innerHTML = '';
+  
+  // Fetch historical entries for this exercise
+  const historyEntries = [];
+  workoutHistory.forEach(workout => {
+    const match = workout.exercises.find(ex => ex.id === exerciseId);
+    if (match && match.sets.length > 0) {
+      historyEntries.push({
+        date: new Date(workout.startTime).toLocaleDateString(undefined, {
+          month: 'short', day: 'numeric', year: 'numeric'
+        }),
+        sets: match.sets,
+        unit: workout.weightUnit || settings.weightUnit
+      });
+    }
+  });
+  
+  // Sort reverse chronological
+  historyEntries.reverse();
+  
+  if (historyEntries.length === 0) {
+    list.innerHTML = '<p style="text-align:center;color:var(--text-muted);font-size:13px;padding:20px 0;">No completed history logs found for this exercise.</p>';
+    return;
+  }
+  
+  historyEntries.forEach(entry => {
+    const card = document.createElement('div');
+    card.className = 'info-history-entry';
+    card.innerHTML = `
+      <div class="info-history-entry-header">
+        <span>${entry.date}</span>
+      </div>
+      <div class="info-history-entry-sets">
+        ${entry.sets.map((s, idx) => `
+          <span style="display:inline-block;margin-right:12px;font-size:12px;">
+            <strong style="color:var(--primary);">${getSetTypeChar(s.type || 'normal', idx + 1)}:</strong> ${s.weight} ${entry.unit} x ${s.reps}
+          </span>
+        `).join('')}
+      </div>
+    `;
+    list.appendChild(card);
+  });
 }
