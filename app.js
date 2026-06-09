@@ -228,13 +228,7 @@ function initUI() {
   
   // Active Workout Buttons
   document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
-  document.querySelectorAll('.start-template-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const templateId = btn.getAttribute('data-template');
-      startWorkout(templateId);
-    });
-  });
+  renderRoutineTemplates();
   
   document.getElementById('cancel-workout-btn').addEventListener('click', cancelActiveWorkout);
   document.getElementById('finish-workout-btn').addEventListener('click', finishActiveWorkout);
@@ -1507,5 +1501,43 @@ function openExerciseHistory(exerciseId, exerciseName, routineNotes) {
       </div>
     `;
     list.appendChild(card);
+  });
+}
+
+function renderRoutineTemplates() {
+  const grid = document.getElementById('template-grid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  
+  Object.keys(ROUTINE_TEMPLATES).forEach(key => {
+    const template = ROUTINE_TEMPLATES[key];
+    const card = document.createElement('div');
+    card.className = 'template-card';
+    card.setAttribute('data-template', key);
+    
+    // Count exercises in this template
+    const count = template.exercises.length;
+    
+    card.innerHTML = `
+      <div class="template-card-header">
+        <h4>${template.name}</h4>
+        <span class="exercise-count">${count} Exercises</span>
+      </div>
+      <p class="template-summary" style="font-size:13px; color:var(--text-secondary); margin-top:4px;">${template.notes || ''}</p>
+      <button class="btn btn-secondary btn-sm start-template-btn" style="margin-top:10px; width:100%;" data-template="${key}">Start</button>
+    `;
+    
+    // Clicking the "Start" button triggers starting the workout
+    card.querySelector('.start-template-btn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      startWorkout(key);
+    });
+    
+    // Clicking the card itself also launches the workout
+    card.addEventListener('click', () => {
+      startWorkout(key);
+    });
+    
+    grid.appendChild(card);
   });
 }
