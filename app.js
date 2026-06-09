@@ -1,0 +1,1288 @@
+// ==========================================================================
+// PulseFit - Core Application & Workout Logging State Management
+// ==========================================================================
+
+// --- Default Exercise Database ---
+const DEFAULT_EXERCISES = [
+  // Chest
+  { id: 'bench-press-barbell', name: 'Bench Press (Barbell)', category: 'Chest' },
+  { id: 'incline-bench-press-barbell', name: 'Incline Bench Press (Barbell)', category: 'Chest' },
+  { id: 'chest-fly-dumbbell', name: 'Chest Fly (Dumbbell)', category: 'Chest' },
+  { id: 'pushups', name: 'Pushups', category: 'Chest' },
+  // Back
+  { id: 'pullups', name: 'Pullups', category: 'Back' },
+  { id: 'barbell-row', name: 'Barbell Row', category: 'Back' },
+  { id: 'lat-pulldown', name: 'Lat Pulldown', category: 'Back' },
+  { id: 'deadlift-barbell', name: 'Deadlift (Barbell)', category: 'Back' },
+  // Legs
+  { id: 'squat-barbell', name: 'Squat (Barbell)', category: 'Legs' },
+  { id: 'leg-press', name: 'Leg Press', category: 'Legs' },
+  { id: 'leg-extension', name: 'Leg Extension', category: 'Legs' },
+  { id: 'lying-leg-curl', name: 'Lying Leg Curl', category: 'Legs' },
+  // Shoulders
+  { id: 'overhead-press-barbell', name: 'Overhead Press (Barbell)', category: 'Shoulders' },
+  { id: 'lateral-raise-dumbbell', name: 'Lateral Raise (Dumbbell)', category: 'Shoulders' },
+  { id: 'face-pulls', name: 'Face Pulls', category: 'Shoulders' },
+  // Arms
+  { id: 'bicep-curl-dumbbell', name: 'Bicep Curl (Dumbbell)', category: 'Arms' },
+  { id: 'tricep-pushdown', name: 'Tricep Pushdown', category: 'Arms' },
+  { id: 'hammer-curl-dumbbell', name: 'Hammer Curl (Dumbbell)', category: 'Arms' },
+  // Core
+  { id: 'plank', name: 'Plank', category: 'Core' },
+  { id: 'hanging-leg-raise', name: 'Hanging Leg Raise', category: 'Core' },
+  { id: 'crunches', name: 'Crunches', category: 'Core' }
+];
+
+// --- Templates ---
+const ROUTINE_TEMPLATES = {
+  push: {
+    name: 'Push Day',
+    notes: 'Focus on chest, shoulders, and triceps.',
+    exercises: [
+      { id: 'bench-press-barbell', sets: [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }] },
+      { id: 'overhead-press-barbell', sets: [{ weight: 95, reps: 8 }, { weight: 95, reps: 8 }, { weight: 95, reps: 8 }] },
+      { id: 'chest-fly-dumbbell', sets: [{ weight: 30, reps: 12 }, { weight: 30, reps: 12 }] },
+      { id: 'tricep-pushdown', sets: [{ weight: 50, reps: 12 }, { weight: 50, reps: 12 }, { weight: 50, reps: 12 }] }
+    ]
+  },
+  pull: {
+    name: 'Pull Day',
+    notes: 'Focus on back, biceps, and rear delts.',
+    exercises: [
+      { id: 'pullups', sets: [{ weight: 0, reps: 8 }, { weight: 0, reps: 8 }, { weight: 0, reps: 6 }] },
+      { id: 'barbell-row', sets: [{ weight: 135, reps: 10 }, { weight: 135, reps: 10 }, { weight: 135, reps: 10 }] },
+      { id: 'lat-pulldown', sets: [{ weight: 120, reps: 10 }, { weight: 120, reps: 10 }] },
+      { id: 'bicep-curl-dumbbell', sets: [{ weight: 25, reps: 12 }, { weight: 25, reps: 12 }, { weight: 25, reps: 10 }] }
+    ]
+  },
+  legs: {
+    name: 'Leg Day',
+    notes: 'Quad and hamstring dominant leg day.',
+    exercises: [
+      { id: 'squat-barbell', sets: [{ weight: 185, reps: 8 }, { weight: 185, reps: 8 }, { weight: 185, reps: 8 }] },
+      { id: 'leg-press', sets: [{ weight: 270, reps: 10 }, { weight: 270, reps: 10 }] },
+      { id: 'lying-leg-curl', sets: [{ weight: 80, reps: 12 }, { weight: 80, reps: 12 }, { weight: 80, reps: 12 }] },
+      { id: 'hanging-leg-raise', sets: [{ weight: 0, reps: 15 }, { weight: 0, reps: 15 }] }
+    ]
+  }
+};
+
+// --- App State ---
+let workoutHistory = [];
+let exercises = [];
+let activeWorkout = null;
+let settings = {
+  apiKey: '',
+  googleClientId: '',
+  weightUnit: 'lbs',
+  defaultRest: 90,
+  timerSound: true
+};
+
+// --- Timer & Visuals State ---
+let workoutTimerInterval = null;
+let restTimerInterval = null;
+let restTimerTotalSeconds = 0;
+let restTimerSecondsRemaining = 0;
+let analyticsChart = null;
+
+// ==========================================================================
+// Initialization & Storage
+// ==========================================================================
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadData();
+  initUI();
+  lucide.createIcons();
+});
+
+function loadData() {
+  // Load settings
+  const storedSettings = localStorage.getItem('pulsefit_settings');
+  if (storedSettings) {
+    settings = { ...settings, ...JSON.parse(storedSettings) };
+  }
+  
+  // Load exercise DB
+  const storedExercises = localStorage.getItem('pulsefit_exercises');
+  if (storedExercises) {
+    exercises = JSON.parse(storedExercises);
+  } else {
+    exercises = [...DEFAULT_EXERCISES];
+    saveExercises();
+  }
+  
+  // Load history
+  const storedHistory = localStorage.getItem('pulsefit_history');
+  if (storedHistory) {
+    workoutHistory = JSON.parse(storedHistory);
+  }
+  
+  // Load active workout if crashed/reloaded
+  const storedActiveWorkout = localStorage.getItem('pulsefit_active_workout');
+  if (storedActiveWorkout) {
+    activeWorkout = JSON.parse(storedActiveWorkout);
+  }
+}
+
+function saveSettings() {
+  localStorage.setItem('pulsefit_settings', JSON.stringify(settings));
+  updateAPIStatusPill();
+  if (typeof updateGDriveStatus === 'function') {
+    updateGDriveStatus(isGDriveConnected() ? 'connected' : 'disconnected');
+  }
+}
+
+function saveExercises() {
+  localStorage.setItem('pulsefit_exercises', JSON.stringify(exercises));
+}
+
+function saveHistory() {
+  localStorage.setItem('pulsefit_history', JSON.stringify(workoutHistory));
+}
+
+function saveActiveWorkoutState() {
+  if (activeWorkout) {
+    localStorage.setItem('pulsefit_active_workout', JSON.stringify(activeWorkout));
+  } else {
+    localStorage.removeItem('pulsefit_active_workout');
+  }
+}
+
+// ==========================================================================
+// UI Initialization
+// ==========================================================================
+
+function initUI() {
+  // Setup API Status Pill
+  updateAPIStatusPill();
+  
+  // Navigation / Tabs
+  const navItems = document.querySelectorAll('.nav-item');
+  navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+      const tabId = item.getAttribute('data-tab');
+      switchTab(tabId);
+    });
+  });
+  
+  // Active workout check
+  if (activeWorkout) {
+    restoreActiveWorkout();
+  } else {
+    renderStartWorkoutView();
+  }
+  
+  // Event listeners for Settings
+  document.getElementById('open-settings-btn').addEventListener('click', openSettingsModal);
+  document.getElementById('close-settings-modal').addEventListener('click', closeSettingsModal);
+  document.getElementById('save-api-key-btn').addEventListener('click', saveAPIKey);
+  document.getElementById('api-status-pill').addEventListener('click', () => {
+    if (settings.apiKey === '') openSettingsModal();
+  });
+  
+  // Event listeners for Settings Preferences
+  const unitLbs = document.getElementById('unit-lbs');
+  const unitKg = document.getElementById('unit-kg');
+  unitLbs.addEventListener('click', () => setWeightUnit('lbs'));
+  unitKg.addEventListener('click', () => setWeightUnit('kg'));
+  
+  const restTimerSelect = document.getElementById('settings-default-rest');
+  restTimerSelect.value = settings.defaultRest;
+  restTimerSelect.addEventListener('change', (e) => {
+    settings.defaultRest = parseInt(e.target.value);
+    saveSettings();
+  });
+  
+  const timerSoundCheckbox = document.getElementById('settings-timer-sound');
+  timerSoundCheckbox.checked = settings.timerSound;
+  timerSoundCheckbox.addEventListener('change', (e) => {
+    settings.timerSound = e.target.checked;
+    saveSettings();
+  });
+  
+  // Backup & Restore
+  document.getElementById('export-data-btn').addEventListener('click', exportData);
+  document.getElementById('import-data-file').addEventListener('change', importData);
+  document.getElementById('reset-app-btn').addEventListener('click', resetAppData);
+  
+  // Google Drive Sync Listeners
+  document.getElementById('save-google-client-id-btn').addEventListener('click', () => {
+    const cid = document.getElementById('settings-google-client-id').value.trim();
+    settings.googleClientId = cid;
+    saveSettings();
+    alert('Google Client ID saved!');
+  });
+  
+  document.getElementById('connect-gdrive-btn').addEventListener('click', () => {
+    if (typeof connectGoogleDrive === 'function') connectGoogleDrive();
+  });
+  
+  document.getElementById('toggle-gdrive-help').addEventListener('click', () => {
+    const help = document.getElementById('gdrive-help-content');
+    help.classList.toggle('hidden');
+  });
+  
+  // Active Workout Buttons
+  document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
+  document.querySelectorAll('.start-template-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const templateId = btn.getAttribute('data-template');
+      startWorkout(templateId);
+    });
+  });
+  
+  document.getElementById('cancel-workout-btn').addEventListener('click', cancelActiveWorkout);
+  document.getElementById('finish-workout-btn').addEventListener('click', finishActiveWorkout);
+  document.getElementById('add-exercise-btn').addEventListener('click', openExerciseModal);
+  document.getElementById('close-exercise-modal').addEventListener('click', closeExerciseModal);
+  
+  // Exercise Modal Search & Filters
+  document.getElementById('exercise-search').addEventListener('input', filterExercises);
+  document.querySelectorAll('.category-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+      document.querySelectorAll('.category-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      filterExercises();
+    });
+  });
+  
+  document.getElementById('create-custom-exercise-btn').addEventListener('click', createCustomExercise);
+  
+  // History tab events
+  document.getElementById('history-search').addEventListener('input', renderHistoryTab);
+  
+  // Analytics tab events
+  document.getElementById('analytics-exercise-select').addEventListener('change', updateAnalyticsChart);
+  document.getElementById('analytics-metric-select').addEventListener('change', updateAnalyticsChart);
+  
+  // Rest Timer buttons
+  document.getElementById('timer-minus-30').addEventListener('click', () => adjustRestTimer(-30));
+  document.getElementById('timer-plus-30').addEventListener('click', () => adjustRestTimer(30));
+  document.getElementById('timer-skip').addEventListener('click', skipRestTimer);
+  
+  // Init Settings Fields
+  document.getElementById('settings-api-key').value = settings.apiKey;
+  document.getElementById('settings-google-client-id').value = settings.googleClientId || '';
+  if (settings.weightUnit === 'kg') {
+    unitLbs.classList.remove('active');
+    unitKg.classList.add('active');
+  }
+  
+  if (typeof updateGDriveStatus === 'function') {
+    updateGDriveStatus(isGDriveConnected() ? 'connected' : 'disconnected');
+  }
+}
+
+function switchTab(tabId) {
+  // Deactivate all
+  document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+  document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+  
+  // Activate selected
+  const activeBtn = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
+  const activePane = document.getElementById(tabId);
+  
+  if (activeBtn && activePane) {
+    activeBtn.classList.add('active');
+    activePane.classList.add('active');
+    
+    // Update topbar title
+    const pageTitle = document.getElementById('page-title');
+    if (tabId === 'tab-logger') {
+      pageTitle.textContent = activeWorkout ? 'Active Workout' : 'Log Workout';
+    } else if (tabId === 'tab-history') {
+      pageTitle.textContent = 'Workout History';
+      renderHistoryTab();
+    } else if (tabId === 'tab-analytics') {
+      pageTitle.textContent = 'Analytics';
+      renderAnalyticsTab();
+    } else if (tabId === 'tab-coach') {
+      pageTitle.textContent = 'Gemini Fitness Coach';
+      initGeminiCoachUI();
+    }
+  }
+}
+
+function updateAPIStatusPill() {
+  const pill = document.getElementById('api-status-pill');
+  const text = document.getElementById('api-status-text');
+  
+  if (settings.apiKey && settings.apiKey.trim().startsWith('AIzaSy')) {
+    pill.className = 'api-status-pill success';
+    text.textContent = 'API Key Active';
+  } else {
+    pill.className = 'api-status-pill error';
+    text.textContent = 'No API Key';
+  }
+}
+
+// ==========================================================================
+// Settings Modal Functions
+// ==========================================================================
+
+function openSettingsModal() {
+  document.getElementById('settings-modal').classList.remove('hidden');
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').classList.add('hidden');
+}
+
+function saveAPIKey() {
+  const keyInput = document.getElementById('settings-api-key');
+  const keyValue = keyInput.value.trim();
+  
+  if (keyValue === '') {
+    settings.apiKey = '';
+    saveSettings();
+    alert('API Key cleared.');
+    closeSettingsModal();
+    return;
+  }
+  
+  if (!keyValue.startsWith('AIzaSy')) {
+    alert('Invalid Gemini API Key format. It should start with "AIzaSy".');
+    return;
+  }
+  
+  settings.apiKey = keyValue;
+  saveSettings();
+  alert('Gemini API Key saved successfully!');
+  closeSettingsModal();
+}
+
+function setWeightUnit(unit) {
+  settings.weightUnit = unit;
+  document.getElementById('unit-lbs').classList.toggle('active', unit === 'lbs');
+  document.getElementById('unit-kg').classList.toggle('active', unit === 'kg');
+  
+  // Update standard metric units in DOM if needed
+  const metricOptions = document.getElementById('analytics-metric-select');
+  if (metricOptions) {
+    metricOptions.options[0].text = `Estimated 1RM (${unit})`;
+    metricOptions.options[1].text = `Total Volume (${unit})`;
+    metricOptions.options[2].text = `Max Weight (${unit})`;
+  }
+  
+  saveSettings();
+  
+  // Re-render currently active lists
+  if (activeWorkout) {
+    renderActiveWorkoutExercises();
+  }
+}
+
+// Backup & Recovery
+function exportData() {
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+    settings,
+    exercises,
+    workoutHistory
+  }, null, 2));
+  const downloadAnchor = document.createElement('a');
+  downloadAnchor.setAttribute("href", dataStr);
+  downloadAnchor.setAttribute("download", `pulsefit_backup_${new Date().toISOString().slice(0,10)}.json`);
+  document.body.appendChild(downloadAnchor);
+  downloadAnchor.click();
+  downloadAnchor.remove();
+}
+
+function importData(e) {
+  const fileReader = new FileReader();
+  fileReader.onload = function(event) {
+    try {
+      const parsedData = JSON.parse(event.target.result);
+      if (parsedData.settings) settings = { ...settings, ...parsedData.settings };
+      if (parsedData.exercises) exercises = parsedData.exercises;
+      if (parsedData.workoutHistory) workoutHistory = parsedData.workoutHistory;
+      
+      saveSettings();
+      saveExercises();
+      saveHistory();
+      
+      alert('Data imported successfully!');
+      location.reload();
+    } catch (err) {
+      alert('Failed to parse JSON backup file.');
+    }
+  };
+  fileReader.readAsText(e.target.files[0]);
+}
+
+function resetAppData() {
+  if (confirm('Are you absolutely sure you want to delete all workouts, settings, and custom exercises? This cannot be undone.')) {
+    localStorage.clear();
+    alert('Application data reset successfully.');
+    location.reload();
+  }
+}
+
+// ==========================================================================
+// Workout Logging - Session Management
+// ==========================================================================
+
+function renderStartWorkoutView() {
+  document.getElementById('start-workout-view').classList.remove('hidden');
+  document.getElementById('active-workout-view').classList.add('hidden');
+  document.getElementById('active-workout-pill').classList.add('hidden');
+  
+  // Reset Title
+  document.getElementById('page-title').textContent = 'Log Workout';
+}
+
+function startWorkout(templateId = null) {
+  // Check if there's already an active workout
+  if (activeWorkout) return;
+  
+  let name = 'Morning Workout';
+  const hour = new Date().getHours();
+  if (hour >= 12 && hour < 17) name = 'Afternoon Workout';
+  else if (hour >= 17 && hour < 22) name = 'Evening Workout';
+  else if (hour >= 22 || hour < 5) name = 'Night Workout';
+  
+  let workoutExercises = [];
+  let notes = '';
+  
+  if (templateId && ROUTINE_TEMPLATES[templateId]) {
+    const template = ROUTINE_TEMPLATES[templateId];
+    name = template.name;
+    notes = template.notes;
+    
+    // Map template exercises to full objects
+    workoutExercises = template.exercises.map(te => {
+      const dbExercise = exercises.find(ex => ex.id === te.id);
+      return {
+        id: te.id,
+        name: dbExercise ? dbExercise.name : te.id,
+        category: dbExercise ? dbExercise.category : 'Other',
+        sets: te.sets.map((s, index) => ({
+          weight: s.weight,
+          reps: s.reps,
+          completed: false
+        }))
+      };
+    });
+  }
+  
+  activeWorkout = {
+    name: name,
+    startTime: Date.now(),
+    notes: notes,
+    exercises: workoutExercises
+  };
+  
+  saveActiveWorkoutState();
+  restoreActiveWorkout();
+}
+
+function restoreActiveWorkout() {
+  document.getElementById('start-workout-view').classList.add('hidden');
+  document.getElementById('active-workout-view').classList.remove('hidden');
+  
+  // Update inputs
+  document.getElementById('workout-name-input').value = activeWorkout.name;
+  document.getElementById('workout-notes-input').value = activeWorkout.notes || '';
+  
+  // Setup Page Title
+  document.getElementById('page-title').textContent = 'Active Workout';
+  
+  // Start duration timer
+  startWorkoutDurationTimer();
+  
+  // Render exercises
+  renderActiveWorkoutExercises();
+  
+  // Setup name and notes changes
+  document.getElementById('workout-name-input').oninput = (e) => {
+    activeWorkout.name = e.target.value;
+    saveActiveWorkoutState();
+  };
+  
+  document.getElementById('workout-notes-input').oninput = (e) => {
+    activeWorkout.notes = e.target.value;
+    saveActiveWorkoutState();
+  };
+}
+
+function startWorkoutDurationTimer() {
+  const timerPill = document.getElementById('active-workout-pill');
+  const timerText = document.getElementById('workout-timer-text');
+  timerPill.classList.remove('hidden');
+  
+  if (workoutTimerInterval) clearInterval(workoutTimerInterval);
+  
+  function updateTimer() {
+    if (!activeWorkout) return;
+    const elapsedMs = Date.now() - activeWorkout.startTime;
+    const totalSecs = Math.floor(elapsedMs / 1000);
+    const hrs = Math.floor(totalSecs / 3600);
+    const mins = Math.floor((totalSecs % 3600) / 60);
+    const secs = totalSecs % 60;
+    
+    let timeStr = '';
+    if (hrs > 0) {
+      timeStr = `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      timeStr = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    timerText.textContent = timeStr;
+  }
+  
+  updateTimer();
+  workoutTimerInterval = setInterval(updateTimer, 1000);
+}
+
+function renderActiveWorkoutExercises() {
+  const container = document.getElementById('workout-exercises-list');
+  container.innerHTML = '';
+  
+  if (activeWorkout.exercises.length === 0) {
+    container.innerHTML = `
+      <div class="workout-hero" style="padding: 30px; border-style: dashed; background: none; box-shadow: none;">
+        <i data-lucide="plus-circle" style="width: 24px; height: 24px; color: var(--text-muted); margin-bottom: 8px;"></i>
+        <p style="margin-bottom: 0;">Add your first exercise to start logging.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  activeWorkout.exercises.forEach((ex, exIndex) => {
+    const card = document.createElement('div');
+    card.className = 'logger-exercise-card';
+    card.innerHTML = `
+      <div class="logger-exercise-header">
+        <div class="logger-exercise-title">
+          <h4>${ex.name}</h4>
+          <span>${ex.category}</span>
+        </div>
+        <button class="btn-remove-exercise" onclick="removeExerciseFromActive(${exIndex})" title="Remove Exercise">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+      
+      <table class="set-table">
+        <thead>
+          <tr>
+            <th width="8%" class="center">Set</th>
+            <th width="32%">Previous</th>
+            <th width="24%" class="center">${settings.weightUnit}</th>
+            <th width="24%" class="center">Reps</th>
+            <th width="12%" class="center">Done</th>
+          </tr>
+        </thead>
+        <tbody id="exercise-${exIndex}-sets">
+          <!-- Sets dynamically populated -->
+        </tbody>
+      </table>
+      
+      <button class="btn-add-set" onclick="addSetToActiveExercise(${exIndex})">
+        <i data-lucide="plus"></i> Add Set
+      </button>
+    `;
+    
+    container.appendChild(card);
+    
+    // Find previous workout sets for this exercise to show as target
+    const prevSets = getPreviousSetsForExercise(ex.id);
+    
+    // Render sets for this exercise
+    const setsBody = document.getElementById(`exercise-${exIndex}-sets`);
+    ex.sets.forEach((set, setIndex) => {
+      const prevText = prevSets && prevSets[setIndex] 
+        ? `${prevSets[setIndex].weight} ${settings.weightUnit} x ${prevSets[setIndex].reps}`
+        : '&mdash;';
+        
+      const setRow = document.createElement('tr');
+      setRow.className = `set-row ${set.completed ? 'completed-row' : ''}`;
+      setRow.innerHTML = `
+        <td class="center"><span class="set-number-label">${setIndex + 1}</span></td>
+        <td><span class="set-prev-label">${prevText}</span></td>
+        <td class="center">
+          <input type="number" step="any" class="set-input weight-input" 
+            value="${set.weight !== null ? set.weight : ''}" 
+            placeholder="0"
+            onchange="updateSetData(${exIndex}, ${setIndex}, 'weight', this.value)"
+            ${set.completed ? 'disabled' : ''}>
+        </td>
+        <td class="center">
+          <input type="number" class="set-input reps-input" 
+            value="${set.reps !== null ? set.reps : ''}" 
+            placeholder="0"
+            onchange="updateSetData(${exIndex}, ${setIndex}, 'reps', this.value)"
+            ${set.completed ? 'disabled' : ''}>
+        </td>
+        <td class="center">
+          <button class="btn-complete-set ${set.completed ? 'completed' : ''}" 
+            onclick="toggleSetCompletion(${exIndex}, ${setIndex})">
+            <i data-lucide="check"></i>
+          </button>
+        </td>
+        <td width="4%">
+          <button class="btn-delete-set" onclick="removeSetFromActiveExercise(${exIndex}, ${setIndex})" title="Delete Set">
+            <i data-lucide="x"></i>
+          </button>
+        </td>
+      `;
+      setsBody.appendChild(setRow);
+    });
+  });
+  
+  lucide.createIcons();
+}
+
+function getPreviousSetsForExercise(exerciseId) {
+  // Scan backward through history to find the most recent completed workout containing this exercise
+  for (let i = workoutHistory.length - 1; i >= 0; i--) {
+    const workout = workoutHistory[i];
+    const match = workout.exercises.find(ex => ex.id === exerciseId);
+    if (match) return match.sets;
+  }
+  return null;
+}
+
+function updateSetData(exIndex, setIndex, field, value) {
+  const val = parseFloat(value);
+  activeWorkout.exercises[exIndex].sets[setIndex][field] = isNaN(val) ? null : val;
+  saveActiveWorkoutState();
+}
+
+function addSetToActiveExercise(exIndex) {
+  const sets = activeWorkout.exercises[exIndex].sets;
+  let weight = 0;
+  let reps = 10;
+  
+  // Copy weights/reps from previous set if it exists
+  if (sets.length > 0) {
+    const lastSet = sets[sets.length - 1];
+    weight = lastSet.weight;
+    reps = lastSet.reps;
+  } else {
+    // Attempt to copy from historical previous workout
+    const prevSets = getPreviousSetsForExercise(activeWorkout.exercises[exIndex].id);
+    if (prevSets && prevSets.length > 0) {
+      weight = prevSets[0].weight;
+      reps = prevSets[0].reps;
+    }
+  }
+  
+  sets.push({ weight, reps, completed: false });
+  saveActiveWorkoutState();
+  renderActiveWorkoutExercises();
+}
+
+function removeSetFromActiveExercise(exIndex, setIndex) {
+  activeWorkout.exercises[exIndex].sets.splice(setIndex, 1);
+  saveActiveWorkoutState();
+  renderActiveWorkoutExercises();
+}
+
+function toggleSetCompletion(exIndex, setIndex) {
+  const set = activeWorkout.exercises[exIndex].sets[setIndex];
+  set.completed = !set.completed;
+  
+  saveActiveWorkoutState();
+  renderActiveWorkoutExercises();
+  
+  // Trigger rest timer on completed set (if checked)
+  if (set.completed) {
+    // Fill in default values if user completed a set without typing weights/reps
+    if (set.weight === null) set.weight = 0;
+    if (set.reps === null) set.reps = 0;
+    
+    startRestTimer(settings.defaultRest);
+  }
+}
+
+function removeExerciseFromActive(exIndex) {
+  if (confirm(`Remove "${activeWorkout.exercises[exIndex].name}" from this workout?`)) {
+    activeWorkout.exercises.splice(exIndex, 1);
+    saveActiveWorkoutState();
+    renderActiveWorkoutExercises();
+  }
+}
+
+// ==========================================================================
+// Exercise Selection Modal
+// ==========================================================================
+
+function openExerciseModal() {
+  document.getElementById('exercise-modal').classList.remove('hidden');
+  document.getElementById('exercise-search').value = '';
+  document.getElementById('exercise-search').focus();
+  filterExercises();
+}
+
+function closeExerciseModal() {
+  document.getElementById('exercise-modal').classList.add('hidden');
+}
+
+function filterExercises() {
+  const searchVal = document.getElementById('exercise-search').value.toLowerCase().trim();
+  const selectedCategory = document.querySelector('.category-pill.active').getAttribute('data-category');
+  const listContainer = document.getElementById('exercise-select-list');
+  listContainer.innerHTML = '';
+  
+  const filtered = exercises.filter(ex => {
+    const matchesSearch = ex.name.toLowerCase().includes(searchVal);
+    const matchesCategory = selectedCategory === 'all' || ex.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+  
+  // Sort alphabetically
+  filtered.sort((a, b) => a.name.localeCompare(b.name));
+  
+  if (filtered.length === 0) {
+    listContainer.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:20px;">No exercises found.</p>`;
+    return;
+  }
+  
+  filtered.forEach(ex => {
+    const item = document.createElement('button');
+    item.className = 'exercise-select-item';
+    item.innerHTML = `
+      <div class="exercise-select-info">
+        <h4>${ex.name}</h4>
+        <span>${ex.category}</span>
+      </div>
+      <i data-lucide="chevron-right"></i>
+    `;
+    item.addEventListener('click', () => {
+      addExerciseToActive(ex);
+      closeExerciseModal();
+    });
+    listContainer.appendChild(item);
+  });
+  
+  lucide.createIcons();
+}
+
+function addExerciseToActive(exercise) {
+  // Check if exercise already exists in workout
+  const exists = activeWorkout.exercises.some(ex => ex.id === exercise.id);
+  if (exists) {
+    alert(`"${exercise.name}" is already in this workout.`);
+    return;
+  }
+  
+  // Create first set copying previous workout or default
+  let weight = 0;
+  let reps = 10;
+  const prevSets = getPreviousSetsForExercise(exercise.id);
+  if (prevSets && prevSets.length > 0) {
+    weight = prevSets[0].weight;
+    reps = prevSets[0].reps;
+  }
+  
+  activeWorkout.exercises.push({
+    id: exercise.id,
+    name: exercise.name,
+    category: exercise.category,
+    sets: [{ weight, reps, completed: false }]
+  });
+  
+  saveActiveWorkoutState();
+  renderActiveWorkoutExercises();
+}
+
+function createCustomExercise() {
+  const nameInput = document.getElementById('custom-exercise-name');
+  const catSelect = document.getElementById('custom-exercise-category');
+  const name = nameInput.value.trim();
+  const category = catSelect.value;
+  
+  if (name === '') {
+    alert('Please enter an exercise name.');
+    return;
+  }
+  
+  // Check if exists
+  const exists = exercises.some(ex => ex.name.toLowerCase() === name.toLowerCase());
+  if (exists) {
+    alert('An exercise with this name already exists.');
+    return;
+  }
+  
+  const id = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+  const newExercise = { id, name, category };
+  
+  exercises.push(newExercise);
+  saveExercises();
+  
+  nameInput.value = '';
+  filterExercises();
+  alert(`Custom exercise "${name}" created!`);
+}
+
+// ==========================================================================
+// Finish / Cancel Session
+// ==========================================================================
+
+function cancelActiveWorkout() {
+  if (confirm('Are you sure you want to cancel and delete this workout? This cannot be undone.')) {
+    activeWorkout = null;
+    saveActiveWorkoutState();
+    
+    // Stop timers
+    if (workoutTimerInterval) clearInterval(workoutTimerInterval);
+    document.getElementById('active-workout-pill').classList.add('hidden');
+    skipRestTimer();
+    
+    renderStartWorkoutView();
+  }
+}
+
+function finishActiveWorkout() {
+  if (activeWorkout.exercises.length === 0) {
+    alert('Please add at least one exercise to finish your workout.');
+    return;
+  }
+  
+  // Filter out exercises that have no completed sets
+  const completedExercises = activeWorkout.exercises.map(ex => {
+    return {
+      id: ex.id,
+      name: ex.name,
+      category: ex.category,
+      sets: ex.sets.filter(s => s.completed)
+    };
+  }).filter(ex => ex.sets.length > 0);
+  
+  if (completedExercises.length === 0) {
+    alert('Please complete at least one set to finish the workout. Click the checkbox on completed sets.');
+    return;
+  }
+  
+  const finalWorkout = {
+    id: 'workout_' + Date.now(),
+    name: activeWorkout.name || 'Workout',
+    notes: activeWorkout.notes || '',
+    startTime: activeWorkout.startTime,
+    endTime: Date.now(),
+    exercises: completedExercises,
+    weightUnit: settings.weightUnit
+  };
+  
+  // Save to history
+  workoutHistory.push(finalWorkout);
+  saveHistory();
+  
+  // Reset active state
+  activeWorkout = null;
+  saveActiveWorkoutState();
+  
+  // Timers cleanup
+  if (workoutTimerInterval) clearInterval(workoutTimerInterval);
+  document.getElementById('active-workout-pill').classList.add('hidden');
+  skipRestTimer();
+  
+  // Check Google Drive Sync
+  if (typeof isGDriveConnected === 'function' && isGDriveConnected()) {
+    // Show a temporary visual indication
+    console.log("Google Drive connected, syncing workout in background...");
+    syncWorkoutToDrive(finalWorkout).then(syncSuccess => {
+      if (syncSuccess) {
+        alert('Workout saved locally and successfully synced to Google Drive!');
+      } else {
+        alert('Workout saved locally, but Google Drive sync failed. Please check your credentials in Settings.');
+      }
+    });
+  } else {
+    alert('Workout saved successfully!');
+  }
+  
+  // Navigate to History Tab
+  switchTab('tab-history');
+}
+
+// ==========================================================================
+// Rest Timer Overlay
+// ==========================================================================
+
+function startRestTimer(seconds) {
+  restTimerTotalSeconds = seconds;
+  restTimerSecondsRemaining = seconds;
+  
+  const timerOverlay = document.getElementById('floating-timer');
+  const digits = document.getElementById('timer-digits');
+  const progressBar = document.getElementById('timer-progress-bar');
+  
+  timerOverlay.classList.remove('hidden');
+  updateRestTimerUI();
+  
+  if (restTimerInterval) clearInterval(restTimerInterval);
+  
+  restTimerInterval = setInterval(() => {
+    restTimerSecondsRemaining--;
+    updateRestTimerUI();
+    
+    if (restTimerSecondsRemaining <= 0) {
+      clearInterval(restTimerInterval);
+      playTimerAlertSound();
+      timerOverlay.classList.add('hidden');
+    }
+  }, 1000);
+}
+
+function updateRestTimerUI() {
+  const digits = document.getElementById('timer-digits');
+  const progressBar = document.getElementById('timer-progress-bar');
+  
+  const mins = Math.floor(restTimerSecondsRemaining / 60);
+  const secs = restTimerSecondsRemaining % 60;
+  digits.textContent = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  
+  const percent = (restTimerSecondsRemaining / restTimerTotalSeconds) * 100;
+  progressBar.style.width = `${percent}%`;
+}
+
+function adjustRestTimer(seconds) {
+  restTimerSecondsRemaining += seconds;
+  if (restTimerSecondsRemaining < 0) restTimerSecondsRemaining = 0;
+  
+  // If we increased beyond the initial total, update total to keep progress bar clean
+  if (restTimerSecondsRemaining > restTimerTotalSeconds) {
+    restTimerTotalSeconds = restTimerSecondsRemaining;
+  }
+  updateRestTimerUI();
+}
+
+function skipRestTimer() {
+  if (restTimerInterval) clearInterval(restTimerInterval);
+  document.getElementById('floating-timer').classList.add('hidden');
+}
+
+function playTimerAlertSound() {
+  if (!settings.timerSound) return;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // First tone
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, ctx.currentTime); // A5 note
+    gain1.gain.setValueAtTime(0, ctx.currentTime);
+    gain1.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.3);
+    
+    // Second tone after 400ms
+    setTimeout(() => {
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(880, ctx.currentTime);
+      gain2.gain.setValueAtTime(0, ctx.currentTime);
+      gain2.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05);
+      gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+      osc2.start(ctx.currentTime);
+      osc2.stop(ctx.currentTime + 0.3);
+    }, 400);
+  } catch (e) {
+    console.error('AudioContext error:', e);
+  }
+}
+
+// ==========================================================================
+// History Tab Rendering
+// ==========================================================================
+
+function renderHistoryTab() {
+  const container = document.getElementById('workout-history-list');
+  const searchVal = document.getElementById('history-search').value.toLowerCase().trim();
+  container.innerHTML = '';
+  
+  if (workoutHistory.length === 0) {
+    container.innerHTML = `
+      <div class="workout-hero" style="background:none; border:none; box-shadow:none;">
+        <i data-lucide="history" style="width:40px; height:40px; color:var(--text-muted); margin-bottom:12px;"></i>
+        <h3>No Workouts Logged Yet</h3>
+        <p>Your history will appear here once you finish a workout.</p>
+      </div>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  // Sort reverse chronological
+  const sortedHistory = [...workoutHistory].sort((a, b) => b.startTime - a.startTime);
+  
+  const filteredHistory = sortedHistory.filter(w => {
+    if (searchVal === '') return true;
+    
+    const matchesName = w.name.toLowerCase().includes(searchVal);
+    const matchesNotes = w.notes && w.notes.toLowerCase().includes(searchVal);
+    const matchesExercise = w.exercises.some(ex => ex.name.toLowerCase().includes(searchVal));
+    
+    return matchesName || matchesNotes || matchesExercise;
+  });
+  
+  if (filteredHistory.length === 0) {
+    container.innerHTML = `<p style="text-align:center;color:var(--text-muted);padding:20px;">No matching workouts found.</p>`;
+    return;
+  }
+  
+  filteredHistory.forEach(workout => {
+    const durationMin = Math.round((workout.endTime - workout.startTime) / 60000);
+    const dateStr = new Date(workout.startTime).toLocaleDateString(undefined, {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    
+    // Sum total weight volume
+    const totalVolume = workout.exercises.reduce((acc, ex) => {
+      return acc + ex.sets.reduce((setAcc, s) => setAcc + (s.weight * s.reps), 0);
+    }, 0);
+    
+    const card = document.createElement('div');
+    card.className = 'history-card';
+    card.innerHTML = `
+      <div class="history-card-header">
+        <div class="history-card-title">
+          <h4>${workout.name}</h4>
+          <span class="history-card-date">${dateStr}</span>
+        </div>
+        <button class="btn-remove-exercise" onclick="deleteHistoryWorkout('${workout.id}', event)" title="Delete Workout">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+      
+      <div class="history-card-meta">
+        <div class="history-card-meta-item">
+          <i data-lucide="clock"></i>
+          <span>${durationMin} mins</span>
+        </div>
+        <div class="history-card-meta-item">
+          <i data-lucide="weight"></i>
+          <span>${totalVolume} ${workout.weightUnit || 'lbs'} volume</span>
+        </div>
+        <div class="history-card-meta-item">
+          <i data-lucide="dumbbell"></i>
+          <span>${workout.exercises.length} exercises</span>
+        </div>
+      </div>
+      
+      ${workout.notes ? `<p class="history-card-notes">${workout.notes}</p>` : ''}
+      
+      <div class="history-card-exercises">
+        ${workout.exercises.map(ex => `
+          <div class="history-exercise-row">
+            <span class="history-exercise-name">${ex.name}</span>
+            <span class="history-exercise-sets">
+              ${ex.sets.map(s => `${s.weight} ${workout.weightUnit || 'lbs'} x ${s.reps}`).join(', ')}
+            </span>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+  
+  lucide.createIcons();
+}
+
+function deleteHistoryWorkout(workoutId, event) {
+  event.stopPropagation(); // Stop trigger history details toggles/other events
+  
+  if (confirm('Delete this workout from history? This action is permanent.')) {
+    workoutHistory = workoutHistory.filter(w => w.id !== workoutId);
+    saveHistory();
+    renderHistoryTab();
+  }
+}
+
+// ==========================================================================
+// Analytics Tab Rendering (Chart.js)
+// ==========================================================================
+
+function renderAnalyticsTab() {
+  const select = document.getElementById('analytics-exercise-select');
+  const selectedIndex = select.selectedIndex;
+  const currentSelectedValue = selectedIndex >= 0 ? select.options[selectedIndex].value : '';
+  
+  select.innerHTML = '';
+  
+  // Gather unique completed exercises from history
+  const uniqueExercises = {};
+  workoutHistory.forEach(w => {
+    w.exercises.forEach(ex => {
+      uniqueExercises[ex.id] = ex.name;
+    });
+  });
+  
+  const exerciseIds = Object.keys(uniqueExercises);
+  
+  if (exerciseIds.length === 0) {
+    document.getElementById('analytics-insights-summary').innerHTML = `
+      <h4><i data-lucide="info"></i> No Data Yet</h4>
+      <p>Please log a workout history first. Analytics charts will render once you have completed at least two sets of an exercise.</p>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  // Populate exercise list
+  exerciseIds.forEach(id => {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.text = uniqueExercises[id];
+    if (id === currentSelectedValue) opt.selected = true;
+    select.appendChild(opt);
+  });
+  
+  updateAnalyticsChart();
+}
+
+function updateAnalyticsChart() {
+  const select = document.getElementById('analytics-exercise-select');
+  if (select.options.length === 0) return;
+  
+  const exerciseId = select.value;
+  const metric = document.getElementById('analytics-metric-select').value;
+  
+  // Gather data points
+  const dataPoints = [];
+  
+  // Sort history chronological
+  const sortedHistory = [...workoutHistory].sort((a, b) => a.startTime - b.startTime);
+  
+  sortedHistory.forEach(workout => {
+    const match = workout.exercises.find(ex => ex.id === exerciseId);
+    if (!match || match.sets.length === 0) return;
+    
+    let value = 0;
+    const dateLabel = new Date(workout.startTime).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    
+    if (metric === '1rm') {
+      // Epley Formula: 1RM = w * (1 + r / 30) for each set, select the highest
+      const oneRMs = match.sets.map(s => {
+        if (s.reps === 1) return s.weight;
+        return s.weight * (1 + s.reps / 30);
+      });
+      value = Math.round(Math.max(...oneRMs));
+    } else if (metric === 'volume') {
+      value = match.sets.reduce((acc, s) => acc + (s.weight * s.reps), 0);
+    } else if (metric === 'max-weight') {
+      value = Math.max(...match.sets.map(s => s.weight));
+    } else if (metric === 'reps') {
+      value = match.sets.reduce((acc, s) => acc + s.reps, 0);
+    }
+    
+    dataPoints.push({
+      date: dateLabel,
+      value: value,
+      unit: workout.weightUnit || settings.weightUnit
+    });
+  });
+  
+  // Setup Chart
+  const ctx = document.getElementById('analyticsChart').getContext('2d');
+  
+  if (analyticsChart) {
+    analyticsChart.destroy();
+  }
+  
+  if (dataPoints.length === 0) {
+    return;
+  }
+  
+  const labelText = document.getElementById('analytics-metric-select').options[document.getElementById('analytics-metric-select').selectedIndex].text;
+  
+  analyticsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: dataPoints.map(dp => dp.date),
+      datasets: [{
+        label: labelText,
+        data: dataPoints.map(dp => dp.value),
+        borderColor: '#6366f1',
+        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+        borderWidth: 3,
+        pointBackgroundColor: '#8b5cf6',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: '#8b5cf6',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+        tension: 0.3
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: { color: '#94a3b8', font: { family: 'Outfit', size: 12 } }
+        },
+        tooltip: {
+          backgroundColor: '#0d1127',
+          titleColor: '#fff',
+          bodyColor: '#f8fafc',
+          borderColor: 'rgba(255,255,255,0.08)',
+          borderWidth: 1,
+          displayColors: false,
+          titleFont: { family: 'Outfit', weight: 'bold' },
+          bodyFont: { family: 'Outfit' }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255, 255, 255, 0.03)' },
+          ticks: { color: '#64748b', font: { family: 'Outfit' } }
+        },
+        y: {
+          grid: { color: 'rgba(255, 255, 255, 0.03)' },
+          ticks: { color: '#64748b', font: { family: 'Outfit' } }
+        }
+      }
+    }
+  });
+  
+  // Render analytical insights text
+  generateAnalyticsInsights(dataPoints, select.options[select.selectedIndex].text, labelText);
+}
+
+function generateAnalyticsInsights(dataPoints, exerciseName, metricLabel) {
+  const insightBox = document.getElementById('analytics-insights-summary');
+  insightBox.innerHTML = '';
+  
+  if (dataPoints.length < 2) {
+    insightBox.innerHTML = `
+      <h4><i data-lucide="sparkles"></i> Insights Panel</h4>
+      <p>Log this exercise in a few more workouts to view progression trends and growth forecasts.</p>
+    `;
+    lucide.createIcons();
+    return;
+  }
+  
+  const firstVal = dataPoints[0].value;
+  const lastVal = dataPoints[dataPoints.length - 1].value;
+  const difference = lastVal - firstVal;
+  const pctChange = firstVal !== 0 ? Math.round((difference / firstVal) * 100) : 0;
+  
+  let insightText = '';
+  if (difference > 0) {
+    insightText = `Outstanding progress! Your <strong>${exerciseName}</strong> (${metricLabel}) has increased by <strong>${difference} ${settings.weightUnit}</strong> (+${pctChange}%) since your first log on this app. Keep pushing the limits!`;
+  } else if (difference < 0) {
+    insightText = `Your <strong>${exerciseName}</strong> (${metricLabel}) is down by <strong>${Math.abs(difference)} ${settings.weightUnit}</strong> (${pctChange}%) compared to your starting baseline. Ensure you are getting adequate recovery and nutrition.`;
+  } else {
+    insightText = `Your <strong>${exerciseName}</strong> (${metricLabel}) has remained steady at <strong>${lastVal} ${settings.weightUnit}</strong>. Consider asking the Gemini Coach how to break this training plateau.`;
+  }
+  
+  insightBox.innerHTML = `
+    <h4><i data-lucide="sparkles"></i> Insights: ${exerciseName}</h4>
+    <p>${insightText}</p>
+  `;
+  
+  lucide.createIcons();
+}

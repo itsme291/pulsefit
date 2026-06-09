@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pulse Fit &bull; Gemini Workout Logger</title>
+  
+  <!-- Google Fonts - Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- Google APIs and Identity Services (GIS) -->
+  <script src="https://apis.google.com/js/api.js"></script>
+  <script src="https://accounts.google.com/gsi/client"></script>
+  
+  <!-- App Handlers -->
+  <script src="gdrive.js" defer></script>
+  <script src="gemini.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Sidebar / Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">
+          <i data-lucide="activity"></i>
+        </div>
+        <div class="brand-text">
+          <span class="pulse-text">Pulse</span>Fit
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <button class="nav-item active" data-tab="tab-logger" id="nav-logger">
+          <i data-lucide="plus-circle"></i>
+          <span>Log Workout</span>
+        </button>
+        <button class="nav-item" data-tab="tab-history" id="nav-history">
+          <i data-lucide="calendar"></i>
+          <span>History</span>
+        </button>
+        <button class="nav-item" data-tab="tab-analytics" id="nav-analytics">
+          <i data-lucide="trending-up"></i>
+          <span>Analytics</span>
+        </button>
+        <button class="nav-item" data-tab="tab-coach" id="nav-coach">
+          <i data-lucide="sparkles"></i>
+          <span>Gemini Coach</span>
+          <span class="pulse-indicator-dot"></span>
+        </button>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <button class="settings-btn" id="open-settings-btn">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
+        </button>
+      </div>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Topbar Header -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 class="page-title" id="page-title">Log Workout</h1>
+        </div>
+        <div class="topbar-right">
+          <!-- Active Workout Pill -->
+          <div class="active-workout-pill hidden" id="active-workout-pill">
+            <span class="pulse-dot"></span>
+            <span class="workout-timer-text" id="workout-timer-text">00:00</span>
+          </div>
+          <!-- API Key Status Pill -->
+          <div class="api-status-pill error" id="api-status-pill">
+            <i data-lucide="key-round"></i>
+            <span id="api-status-text">No API Key</span>
+          </div>
+        </div>
+      </header>
+      
+      <!-- Content Pages -->
+      <div class="content-body">
+        
+        <!-- =================== LOGGER TAB =================== -->
+        <section class="tab-pane active" id="tab-logger">
+          
+          <!-- Start Workout View (Default state) -->
+          <div class="start-workout-container" id="start-workout-view">
+            <div class="workout-hero">
+              <div class="hero-icon">
+                <i data-lucide="dumbbell"></i>
+              </div>
+              <h2>Ready for your workout?</h2>
+              <p>Log your exercises, sets, weights, and reps. Ask Gemini to analyze your performance and suggest increments in real-time.</p>
+              <button class="btn btn-primary btn-large" id="start-workout-btn">
+                <i data-lucide="play"></i>
+                Start an Empty Workout
+              </button>
+            </div>
+            
+            <div class="recent-templates-section">
+              <h3>Quick Start Routine</h3>
+              <div class="template-grid">
+                <div class="template-card" data-template="push">
+                  <div class="template-card-header">
+                    <h4>Push Day</h4>
+                    <span class="exercise-count">4 Exercises</span>
+                  </div>
+                  <p class="template-summary">Chest, Shoulders, Triceps focus</p>
+                  <button class="btn btn-secondary btn-sm start-template-btn" data-template="push">Start</button>
+                </div>
+                <div class="template-card" data-template="pull">
+                  <div class="template-card-header">
+                    <h4>Pull Day</h4>
+                    <span class="exercise-count">4 Exercises</span>
+                  </div>
+                  <p class="template-summary">Back, Biceps focus</p>
+                  <button class="btn btn-secondary btn-sm start-template-btn" data-template="pull">Start</button>
+                </div>
+                <div class="template-card" data-template="legs">
+                  <div class="template-card-header">
+                    <h4>Leg Day</h4>
+                    <span class="exercise-count">4 Exercises</span>
+                  </div>
+                  <p class="template-summary">Quads, Hamstrings, Calves focus</p>
+                  <button class="btn btn-secondary btn-sm start-template-btn" data-template="legs">Start</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Active Workout View (Hidden by default) -->
+          <div class="active-workout-container hidden" id="active-workout-view">
+            <div class="workout-header-fields">
+              <input type="text" class="workout-name-input" id="workout-name-input" value="Morning Workout" placeholder="Workout Name">
+              <textarea class="workout-notes-input" id="workout-notes-input" placeholder="Add workout notes (mood, fatigue, general goals)..."></textarea>
+            </div>
+            
+            <!-- List of logged exercises -->
+            <div class="workout-exercises-list" id="workout-exercises-list">
+              <!-- Dynamically populated -->
+            </div>
+            
+            <div class="workout-actions">
+              <button class="btn btn-outline-primary" id="add-exercise-btn">
+                <i data-lucide="plus"></i> Add Exercise
+              </button>
+              <div class="finish-cancel-actions">
+                <button class="btn btn-danger-text" id="cancel-workout-btn">Cancel</button>
+                <button class="btn btn-success" id="finish-workout-btn">
+                  <i data-lucide="check"></i> Finish Workout
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+          
+        <!-- =================== HISTORY TAB =================== -->
+        <section class="tab-pane" id="tab-history">
+          <div class="history-controls">
+            <div class="search-box">
+              <i data-lucide="search"></i>
+              <input type="text" id="history-search" placeholder="Search workouts or exercises...">
+            </div>
+          </div>
+          
+          <div class="workout-history-list" id="workout-history-list">
+            <!-- Dynamically populated -->
+          </div>
+        </section>
+        
+        <!-- =================== ANALYTICS TAB =================== -->
+        <section class="tab-pane" id="tab-analytics">
+          <div class="analytics-header">
+            <div class="selector-group">
+              <div class="select-wrapper">
+                <label for="analytics-exercise-select">Exercise</label>
+                <select id="analytics-exercise-select">
+                  <!-- Options populated dynamically -->
+                </select>
+              </div>
+              <div class="select-wrapper">
+                <label for="analytics-metric-select">Metric</label>
+                <select id="analytics-metric-select">
+                  <option value="1rm">Estimated 1RM (lbs)</option>
+                  <option value="volume">Total Volume (lbs)</option>
+                  <option value="max-weight">Max Weight (lbs)</option>
+                  <option value="reps">Total Reps</option>
+                </select>
+              </div>
+            </div>
+          </div>
+          
+          <div class="chart-container">
+            <canvas id="analyticsChart"></canvas>
+          </div>
+          
+          <div class="insights-summary" id="analytics-insights-summary">
+            <!-- Dynamic insights -->
+          </div>
+        </section>
+        
+        <!-- =================== GEMINI COACH TAB =================== -->
+        <section class="tab-pane" id="tab-coach">
+          <div class="coach-container">
+            <!-- Welcome screen / empty state -->
+            <div class="coach-welcome" id="coach-welcome">
+              <div class="welcome-avatar">
+                <i data-lucide="sparkles"></i>
+              </div>
+              <h2>Your AI Fitness Coach</h2>
+              <p>Gemini has direct access to your local workout history. Ask for a progression analysis, form tips, or a custom training schedule based on your logs.</p>
+              
+              <div class="quick-prompts-grid">
+                <button class="quick-prompt-card" data-prompt="Analyze my workout history and show my strength trends.">
+                  <i data-lucide="line-chart"></i>
+                  <span>Analyze my progress & strength trends</span>
+                </button>
+                <button class="quick-prompt-card" data-prompt="Look at my last 3 workouts and recommend weight/rep progression targets for my next sessions.">
+                  <i data-lucide="arrow-up-right"></i>
+                  <span>Recommend progression targets</span>
+                </button>
+                <button class="quick-prompt-card" data-prompt="How is my training frequency and volume? Suggest any tweaks to optimize muscle growth.">
+                  <i data-lucide="activity"></i>
+                  <span>Evaluate training frequency & volume</span>
+                </button>
+                <button class="quick-prompt-card" data-prompt="Design a custom workout routine optimization based on what I have logged so far.">
+                  <i data-lucide="layout"></i>
+                  <span>Optimize my current routine</span>
+                </button>
+              </div>
+            </div>
+            
+            <!-- Chat Area -->
+            <div class="coach-chat-area hidden" id="coach-chat-area">
+              <div class="chat-messages" id="chat-messages-container">
+                <!-- Dynamically populated -->
+              </div>
+            </div>
+            
+            <!-- Chat Input Panel -->
+            <div class="chat-input-panel">
+              <div class="chat-input-wrapper">
+                <textarea id="chat-textarea" placeholder="Ask Gemini about your workouts..." rows="1"></textarea>
+                <button class="btn-chat-send" id="chat-send-btn" disabled>
+                  <i data-lucide="send"></i>
+                </button>
+              </div>
+              <div class="chat-input-footer">
+                <span>Gemini 1.5 Flash &bull; Context includes your workout logs</span>
+                <button class="btn btn-secondary-text btn-xs" id="clear-chat-btn">Clear Chat</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        
+      </div>
+    </main>
+    
+    <!-- =================== FLOATING TIMER OVERLAY =================== -->
+    <div class="floating-timer hidden" id="floating-timer">
+      <div class="timer-inner">
+        <div class="timer-info">
+          <span class="timer-title">Resting</span>
+          <span class="timer-digits" id="timer-digits">01:30</span>
+        </div>
+        <div class="timer-controls">
+          <button class="btn-timer-ctrl" id="timer-minus-30">-30s</button>
+          <button class="btn-timer-ctrl" id="timer-plus-30">+30s</button>
+          <button class="btn-timer-ctrl skip" id="timer-skip"><i data-lucide="skip-forward"></i></button>
+        </div>
+      </div>
+      <div class="timer-progress-bar" id="timer-progress-bar"></div>
+    </div>
+    
+    <!-- =================== MODALS =================== -->
+    
+    <!-- Exercise Selection Modal -->
+    <div class="modal-backdrop hidden" id="exercise-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Add Exercise</h3>
+          <button class="modal-close" id="close-exercise-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-search-bar">
+          <i data-lucide="search"></i>
+          <input type="text" id="exercise-search" placeholder="Search exercises...">
+        </div>
+        <div class="modal-categories" id="exercise-categories">
+          <button class="category-pill active" data-category="all">All</button>
+          <button class="category-pill" data-category="Chest">Chest</button>
+          <button class="category-pill" data-category="Back">Back</button>
+          <button class="category-pill" data-category="Legs">Legs</button>
+          <button class="category-pill" data-category="Shoulders">Shoulders</button>
+          <button class="category-pill" data-category="Arms">Arms</button>
+          <button class="category-pill" data-category="Core">Core</button>
+        </div>
+        <div class="exercise-select-list" id="exercise-select-list">
+          <!-- Dynamically populated exercises -->
+        </div>
+        <div class="modal-footer">
+          <div class="custom-exercise-input">
+            <input type="text" id="custom-exercise-name" placeholder="Create Custom Exercise...">
+            <select id="custom-exercise-category">
+              <option value="Chest">Chest</option>
+              <option value="Back">Back</option>
+              <option value="Legs">Legs</option>
+              <option value="Shoulders">Shoulders</option>
+              <option value="Arms">Arms</option>
+              <option value="Core">Core</option>
+              <option value="Other">Other</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="create-custom-exercise-btn">Create</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal-backdrop hidden" id="settings-modal">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>Settings</h3>
+          <button class="modal-close" id="close-settings-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body">
+          <!-- Gemini API Key Section -->
+          <div class="settings-section">
+            <label class="settings-label" for="settings-api-key">Gemini API Key</label>
+            <p class="settings-help">Create a free key at <a href="https://aistudio.google.com/" target="_blank" rel="noopener">Google AI Studio</a>. Saved in local browser storage.</p>
+            <div class="input-with-button">
+              <input type="password" id="settings-api-key" placeholder="AIzaSy...">
+              <button class="btn btn-secondary btn-sm" id="save-api-key-btn">Save Key</button>
+            </div>
+          </div>
+          
+          <!-- Google Drive Sync Section -->
+          <div class="settings-section">
+            <label class="settings-label" for="settings-google-client-id">Google Drive Auto-Sync</label>
+            <p class="settings-help">Sync workouts to Google Drive so Gemini can read them. Requires a Google Cloud Client ID.</p>
+            <div class="input-with-button">
+              <input type="password" id="settings-google-client-id" placeholder="Google Client ID (starts with digits)...">
+              <button class="btn btn-secondary btn-sm" id="save-google-client-id-btn">Save ID</button>
+            </div>
+            
+            <div class="gdrive-connection-panel margin-top-15" style="display:flex; justify-content:space-between; align-items:center;">
+              <button class="btn btn-outline-secondary btn-sm" id="connect-gdrive-btn" disabled>
+                <i data-lucide="log-in"></i> Connect Google Drive
+              </button>
+              <span class="gdrive-status-badge disconnected" id="gdrive-status-badge">Disconnected</span>
+            </div>
+            
+            <button class="btn-secondary-text btn-xs margin-top-15" id="toggle-gdrive-help" style="text-align:left;display:flex;align-items:center;gap:4px;cursor:pointer;">
+              <i data-lucide="help-circle" style="width:12px;height:12px;"></i> How to get a Google Client ID?
+            </button>
+            
+            <div class="gdrive-help-content hidden" id="gdrive-help-content" style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--text-secondary);margin-top:10px;">
+              <ol style="margin-left:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>Go to the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener" style="color:var(--primary);">Google Cloud Console</a>.</li>
+                <li>Create a new project (e.g., "PulseFit").</li>
+                <li>Search for <strong>Google Drive API</strong> and click <strong>Enable</strong>.</li>
+                <li>Go to <strong>APIs & Services</strong> &gt; <strong>OAuth consent screen</strong>:
+                  <ul style="margin-left:12px;list-style-type:circle;">
+                    <li>User Type: <strong>External</strong>.</li>
+                    <li>App name: <strong>PulseFit</strong>.</li>
+                    <li>Developer email: your email.</li>
+                    <li>Add scope: <code>../auth/drive.file</code> (non-sensitive).</li>
+                    <li>Add your own email to <strong>Test Users</strong> (CRITICAL).</li>
+                  </ul>
+                </li>
+                <li>Go to <strong>Credentials</strong> &gt; <strong>Create Credentials</strong> &gt; <strong>OAuth client ID</strong>:
+                  <ul style="margin-left:12px;list-style-type:circle;">
+                    <li>Application type: <strong>Web application</strong>.</li>
+                    <li>Authorized JavaScript origins: <code>http://localhost:8000</code> and/or your hosted site domain.</li>
+                    <li>Authorized redirect URIs: <code>http://localhost:8000</code> and/or your hosted site domain.</li>
+                  </ul>
+                </li>
+                <li>Copy the <strong>Client ID</strong> (e.g. <code>12345-abc.apps.googleusercontent.com</code>) and paste it above!</li>
+              </ol>
+            </div>
+          </div>
+          
+          <!-- Preferences -->
+          <div class="settings-section">
+            <label class="settings-label">Preferences</label>
+            <div class="settings-row">
+              <span>Weight Unit</span>
+              <div class="toggle-group">
+                <button class="toggle-btn active" id="unit-lbs">lbs</button>
+                <button class="toggle-btn" id="unit-kg">kg</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span>Default Rest Timer</span>
+              <select id="settings-default-rest">
+                <option value="60">60 seconds</option>
+                <option value="90" selected>90 seconds</option>
+                <option value="120">120 seconds</option>
+                <option value="180">180 seconds</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <span>Timer Sound Alert</span>
+              <input type="checkbox" id="settings-timer-sound" checked>
+            </div>
+          </div>
+          
+          <!-- Backup & Reset -->
+          <div class="settings-section">
+            <label class="settings-label">Data Management</label>
+            <div class="backup-buttons">
+              <button class="btn btn-outline-secondary btn-sm" id="export-data-btn">
+                <i data-lucide="download"></i> Export JSON
+              </button>
+              <label class="btn btn-outline-secondary btn-sm file-input-label">
+                <i data-lucide="upload"></i> Import JSON
+                <input type="file" id="import-data-file" accept=".json" class="hidden-file-input">
+              </label>
+            </div>
+            <button class="btn btn-danger btn-sm margin-top-15" id="reset-app-btn">
+              <i data-lucide="trash-2"></i> Reset App Data
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+  </div>
+</body>
+</html>
