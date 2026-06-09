@@ -72,7 +72,7 @@ let exercises = [];
 let activeWorkout = null;
 let settings = {
   apiKey: '',
-  googleClientId: '',
+  googleClientId: '413477786705-cks607s474q3tn75dm4fh5l5pnci7rmc.apps.googleusercontent.com',
   googleFolder: 'PulseFit Workouts',
   weightUnit: 'lbs',
   defaultRest: 90,
@@ -101,6 +101,9 @@ function loadData() {
   const storedSettings = localStorage.getItem('pulsefit_settings');
   if (storedSettings) {
     settings = { ...settings, ...JSON.parse(storedSettings) };
+    if (!settings.googleClientId || settings.googleClientId.trim() === '') {
+      settings.googleClientId = '413477786705-cks607s474q3tn75dm4fh5l5pnci7rmc.apps.googleusercontent.com';
+    }
   }
   
   // Load exercise DB
