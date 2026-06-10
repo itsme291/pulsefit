@@ -19,7 +19,8 @@ function initGoogleClient() {
     gapi.load('client', async () => {
       await gapi.client.init({});
       await gapi.client.load('drive', 'v3');
-      console.log('Google Drive API client loaded successfully.');
+      await gapi.client.load('docs', 'v1');
+      console.log('Google APIs loaded successfully.');
       
       // Restore access token from session if available and valid
       restoreSessionToken();
@@ -210,7 +211,42 @@ async function getOrCreateFolder(folderName) {
   }
 }
 
-// --- Sync Workout Log with PulseFit_Workout_Log.md ---
+// --- Append text to a Google Doc using the Docs API ---
+async function appendDocContent(fileId, text) {
+  try {
+    // 1. Get the document metadata to find the body's end index
+    const docResponse = await gapi.client.docs.documents.get({
+      documentId: fileId
+    });
+    
+    const bodyContent = docResponse.result.body.content;
+    const lastElement = bodyContent[bodyContent.length - 1];
+    const endIndex = Math.max(1, lastElement.endIndex - 1);
+    
+    // 2. Perform the batchUpdate to insert text at the end index
+    await gapi.client.docs.documents.batchUpdate({
+      documentId: fileId,
+      resource: {
+        requests: [
+          {
+            insertText: {
+              location: {
+                index: endIndex
+              },
+              text: text
+            }
+          }
+        ]
+      }
+    });
+    console.log('Appended to Google Doc successfully!');
+  } catch (err) {
+    console.error('Error appending to Google Doc:', err);
+    throw err;
+  }
+}
+
+// --- Sync Workout Log with Google Doc PulseFit_Workout_Log ---
 async function syncWorkoutToDrive(workout) {
   if (!isGDriveConnected()) {
     console.warn('Google Drive not authorized or expired. Sync skipped.');
@@ -225,11 +261,11 @@ async function syncWorkoutToDrive(workout) {
     const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
     const folderId = await getOrCreateFolder(folderName);
     
-    console.log(`Searching for PulseFit_Workout_Log.md in folder '${folderName}'...`);
+    console.log(`Searching for Google Doc 'PulseFit_Workout_Log' in folder '${folderName}'...`);
     
-    // 1. Search for existing file in parent folder
+    // 1. Search for existing Google Doc in parent folder
     const searchResponse = await gapi.client.drive.files.list({
-      q: `name = 'PulseFit_Workout_Log.md' and '${folderId}' in parents and trashed = false`,
+      q: `name = 'PulseFit_Workout_Log' and mimeType = 'application/vnd.google-apps.document' and '${folderId}' in parents and trashed = false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
@@ -237,68 +273,40 @@ async function syncWorkoutToDrive(workout) {
     const files = searchResponse.result.files;
     const newLogEntry = formatWorkoutForFile(workout);
     let fileId = null;
-    let fileContent = '';
     
     if (files && files.length > 0) {
-      // File exists - fetch it and append
+      // Google Doc exists - append text
       fileId = files[0].id;
-      const fileFetch = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-        headers: {
-          'Authorization': `Bearer ${gdriveAccessToken}`
-        }
-      });
-      
-      if (fileFetch.ok) {
-        fileContent = await fileFetch.text();
-        fileContent += "\n\n" + newLogEntry;
-      } else {
-        throw new Error('Failed to retrieve existing workout file content.');
-      }
-      
-      console.log('Appending log entry to existing file in GDrive...');
+      console.log('Appending log entry to existing Google Doc in GDrive...');
+      await appendDocContent(fileId, "\n\n" + newLogEntry);
     } else {
-      // File does not exist - create it
+      // Doc does not exist - create it
       const createResponse = await gapi.client.drive.files.create({
         resource: {
-          name: 'PulseFit_Workout_Log.md',
-          mimeType: 'text/markdown',
+          name: 'PulseFit_Workout_Log',
+          mimeType: 'application/vnd.google-apps.document',
           parents: [folderId]
         },
         fields: 'id'
       });
       
       fileId = createResponse.result.id;
+      console.log('Created new Google Doc PulseFit_Workout_Log in GDrive folder...');
       
       const fileHeader = `PULSEFIT WORKOUT DATABASE\n=========================\nThis document stores your logged workouts. Your Gemini AI Workspace extension reads this file to analyze details.\n\n`;
-      fileContent = fileHeader + newLogEntry;
-      
-      console.log('Created new PulseFit_Workout_Log.md file in GDrive folder...');
+      await appendDocContent(fileId, fileHeader + newLogEntry);
     }
     
-    // 2. Upload/Update the file media content
-    const uploadResponse = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${gdriveAccessToken}`,
-        'Content-Type': 'text/markdown'
-      },
-      body: fileContent
-    });
-    
-    if (!uploadResponse.ok) {
-      throw new Error(`Upload returned status ${uploadResponse.status}`);
-    }
-    
-    console.log('Workout successfully synced to Google Drive!');
+    console.log('Workout successfully synced to Google Doc!');
     return true;
     
   } catch (err) {
-    console.error('Google Drive Sync Error:', err);
+    console.error('Google Doc Sync Error:', err);
     return false;
   }
 }
 
-// --- View current log file contents from Google Drive ---
+// --- View current Google Doc contents by exporting it to plain text ---
 async function viewDriveLog() {
   if (!isGDriveConnected()) {
     alert('Please connect Google Drive first.');
@@ -319,7 +327,7 @@ async function viewDriveLog() {
     }
     
     const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
-    console.log(`Searching for PulseFit_Workout_Log.md in folder '${folderName}'...`);
+    console.log(`Searching for Google Doc 'PulseFit_Workout_Log' in folder '${folderName}'...`);
     
     // 1. Find the parent folder
     const searchFolderResponse = await gapi.client.drive.files.list({
@@ -336,23 +344,23 @@ async function viewDriveLog() {
     
     const folderId = folders[0].id;
     
-    // 2. Find the file inside the folder
+    // 2. Find the Google Doc inside the folder
     const searchFileResponse = await gapi.client.drive.files.list({
-      q: `name = 'PulseFit_Workout_Log.md' and '${folderId}' in parents and trashed = false`,
+      q: `name = 'PulseFit_Workout_Log' and mimeType = 'application/vnd.google-apps.document' and '${folderId}' in parents and trashed = false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
     
     const files = searchFileResponse.result.files;
     if (!files || files.length === 0) {
-      contentEl.textContent = `No logged workouts found. The file 'PulseFit_Workout_Log.md' does not exist in your Google Drive yet. Try completing and saving a workout first!`;
+      contentEl.textContent = `No logged workouts found. The Google Doc 'PulseFit_Workout_Log' does not exist in your Google Drive yet. Try completing and saving a workout first!`;
       return;
     }
     
     const fileId = files[0].id;
     
-    // 3. Fetch the content
-    const fileFetch = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    // 3. Export the Google Doc content as plain text
+    const fileFetch = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=text/plain`, {
       headers: {
         'Authorization': `Bearer ${gdriveAccessToken}`
       }
@@ -360,12 +368,12 @@ async function viewDriveLog() {
     
     if (fileFetch.ok) {
       const logText = await fileFetch.text();
-      contentEl.textContent = logText || '(File is empty)';
+      contentEl.textContent = logText || '(Google Doc is empty)';
     } else {
-      throw new Error(`Failed to retrieve file media. Status: ${fileFetch.status}`);
+      throw new Error(`Failed to export Google Doc to text. Status: ${fileFetch.status}`);
     }
   } catch (err) {
-    console.error('Error fetching log file:', err);
-    contentEl.textContent = `Failed to retrieve log file from Google Drive.\n\nDetails:\n${err.message || err}`;
+    console.error('Error fetching Google Doc log:', err);
+    contentEl.textContent = `Failed to retrieve Google Doc log from Google Drive.\n\nDetails:\n${err.message || err}`;
   }
 }
