@@ -210,7 +210,7 @@ async function getOrCreateFolder(folderName) {
   }
 }
 
-// --- Sync Workout Log with PulseFit_Workout_Log.txt ---
+// --- Sync Workout Log with PulseFit_Workout_Log.md ---
 async function syncWorkoutToDrive(workout) {
   if (!isGDriveConnected()) {
     console.warn('Google Drive not authorized or expired. Sync skipped.');
@@ -225,11 +225,11 @@ async function syncWorkoutToDrive(workout) {
     const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
     const folderId = await getOrCreateFolder(folderName);
     
-    console.log(`Searching for PulseFit_Workout_Log.txt in folder '${folderName}'...`);
+    console.log(`Searching for PulseFit_Workout_Log.md in folder '${folderName}'...`);
     
     // 1. Search for existing file in parent folder
     const searchResponse = await gapi.client.drive.files.list({
-      q: `name = 'PulseFit_Workout_Log.txt' and '${folderId}' in parents and trashed = false`,
+      q: `name = 'PulseFit_Workout_Log.md' and '${folderId}' in parents and trashed = false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
@@ -260,8 +260,8 @@ async function syncWorkoutToDrive(workout) {
       // File does not exist - create it
       const createResponse = await gapi.client.drive.files.create({
         resource: {
-          name: 'PulseFit_Workout_Log.txt',
-          mimeType: 'text/plain',
+          name: 'PulseFit_Workout_Log.md',
+          mimeType: 'text/markdown',
           parents: [folderId]
         },
         fields: 'id'
@@ -272,7 +272,7 @@ async function syncWorkoutToDrive(workout) {
       const fileHeader = `PULSEFIT WORKOUT DATABASE\n=========================\nThis document stores your logged workouts. Your Gemini AI Workspace extension reads this file to analyze details.\n\n`;
       fileContent = fileHeader + newLogEntry;
       
-      console.log('Created new PulseFit_Workout_Log.txt file in GDrive folder...');
+      console.log('Created new PulseFit_Workout_Log.md file in GDrive folder...');
     }
     
     // 2. Upload/Update the file media content
@@ -280,7 +280,7 @@ async function syncWorkoutToDrive(workout) {
       method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${gdriveAccessToken}`,
-        'Content-Type': 'text/plain'
+        'Content-Type': 'text/markdown'
       },
       body: fileContent
     });
@@ -319,7 +319,7 @@ async function viewDriveLog() {
     }
     
     const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
-    console.log(`Searching for PulseFit_Workout_Log.txt in folder '${folderName}'...`);
+    console.log(`Searching for PulseFit_Workout_Log.md in folder '${folderName}'...`);
     
     // 1. Find the parent folder
     const searchFolderResponse = await gapi.client.drive.files.list({
@@ -338,14 +338,14 @@ async function viewDriveLog() {
     
     // 2. Find the file inside the folder
     const searchFileResponse = await gapi.client.drive.files.list({
-      q: `name = 'PulseFit_Workout_Log.txt' and '${folderId}' in parents and trashed = false`,
+      q: `name = 'PulseFit_Workout_Log.md' and '${folderId}' in parents and trashed = false`,
       fields: 'files(id, name)',
       spaces: 'drive'
     });
     
     const files = searchFileResponse.result.files;
     if (!files || files.length === 0) {
-      contentEl.textContent = `No logged workouts found. The file 'PulseFit_Workout_Log.txt' does not exist in your Google Drive yet. Try completing and saving a workout first!`;
+      contentEl.textContent = `No logged workouts found. The file 'PulseFit_Workout_Log.md' does not exist in your Google Drive yet. Try completing and saving a workout first!`;
       return;
     }
     
