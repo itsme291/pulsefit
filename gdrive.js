@@ -51,6 +51,15 @@ function restoreSessionToken() {
     }
     
     updateGDriveStatus('connected');
+    
+    // Pull and merge data in the background on startup
+    pullAndMergeDataFromDrive().then(success => {
+      if (success) {
+        if (typeof renderNutritionTab === 'function') renderNutritionTab();
+        if (typeof renderHistory === 'function') renderHistory();
+        if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+      }
+    });
   } else {
     // Token expired or not found
     localStorage.removeItem('pulsefit_gdrive_token');
@@ -95,8 +104,17 @@ function connectGoogleDrive() {
         }
         
         updateGDriveStatus('connected');
-        alert('Connected to Google Drive! Workouts will now auto-sync.');
+        alert('Connected to Google Drive! Workouts and nutrition logs will now auto-sync.');
         closeSettingsModal();
+        
+        // Pull and merge data immediately
+        pullAndMergeDataFromDrive().then(success => {
+          if (success) {
+            if (typeof renderNutritionTab === 'function') renderNutritionTab();
+            if (typeof renderHistory === 'function') renderHistory();
+            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+          }
+        });
       },
       error_callback: (err) => {
         updateGDriveStatus('disconnected');
@@ -120,6 +138,7 @@ function updateGDriveStatus(status) {
   const badge = document.getElementById('gdrive-status-badge');
   const connectBtn = document.getElementById('connect-gdrive-btn');
   const viewLogBtn = document.getElementById('view-gdrive-log-btn');
+  const syncDataBtn = document.getElementById('sync-gdrive-data-btn');
   
   if (!badge || !connectBtn) return;
   
@@ -127,6 +146,10 @@ function updateGDriveStatus(status) {
   
   if (viewLogBtn) {
     viewLogBtn.disabled = (status !== 'connected');
+  }
+  
+  if (syncDataBtn) {
+    syncDataBtn.disabled = (status !== 'connected');
   }
   
   if (status === 'connected') {
@@ -518,5 +541,166 @@ function updateMacrosSyncStatus(statusText) {
     pill.className = 'api-status-pill success';
   } else {
     pill.className = 'api-status-pill error';
+  }
+}
+
+// --- Backup all PulseFit structured data to Google Drive as JSON ---
+async function backupDataToDrive() {
+  if (!isGDriveConnected()) {
+    console.log("Drive not connected. Backup skipped.");
+    return false;
+  }
+  
+  try {
+    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderId = await getOrCreateFolder(folderName);
+    
+    // Compile all local data to sync
+    const backupData = {
+      workoutHistory: workoutHistory,
+      exercises: exercises,
+      nutritionLog: nutritionLog,
+      nutritionTargets: nutritionTargets,
+      settings: {
+        weightUnit: settings.weightUnit,
+        defaultRest: settings.defaultRest,
+        timerSound: settings.timerSound,
+        activeModel: settings.activeModel
+      },
+      lastSynced: Date.now()
+    };
+    
+    // Search if pulsefit_backup.json already exists in parent folder
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = 'pulsefit_backup.json' and mimeType = 'application/json' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchResponse.result.files;
+    let fileId = null;
+    
+    if (files && files.length > 0) {
+      fileId = files[0].id;
+      console.log(`Updating existing backup file in Google Drive (ID: ${fileId})...`);
+      
+      // PATCH file content via media upload
+      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${gdriveAccessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(backupData)
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to update backup file content. Status: ${response.status}`);
+      }
+    } else {
+      console.log('Creating new backup file in Google Drive...');
+      
+      // Multipart POST request to create file with metadata and media content
+      const metadata = {
+        name: 'pulsefit_backup.json',
+        mimeType: 'application/json',
+        parents: [folderId]
+      };
+      
+      const boundary = 'pulsefit_backup_boundary';
+      const delimiter = `\r\n--${boundary}\r\n`;
+      const close_delim = `\r\n--${boundary}--`;
+      
+      const multipartBody = 
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        JSON.stringify(backupData) +
+        close_delim;
+        
+      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${gdriveAccessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`
+        },
+        body: multipartBody
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to create backup file. Status: ${response.status}`);
+      }
+    }
+    
+    console.log('PulseFit data backup completed successfully!');
+    return true;
+  } catch (err) {
+    console.error('PulseFit backup failed:', err);
+    return false;
+  }
+}
+
+// --- Pull all PulseFit structured data from Google Drive and merge with local storage ---
+async function pullAndMergeDataFromDrive() {
+  if (!isGDriveConnected()) {
+    console.log("Drive not connected. Sync/pull skipped.");
+    return false;
+  }
+  
+  try {
+    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderId = await getOrCreateFolder(folderName);
+    
+    // Search for existing backup file
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = 'pulsefit_backup.json' and mimeType = 'application/json' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchResponse.result.files;
+    if (!files || files.length === 0) {
+      console.log("No backup file found in Google Drive yet. Uploading local state as first backup...");
+      // Save current local data to Drive
+      await backupDataToDrive();
+      return true;
+    }
+    
+    const fileId = files[0].id;
+    console.log(`Downloading backup file content from Google Drive (ID: ${fileId})...`);
+    
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${gdriveAccessToken}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to download backup file content. Status: ${response.status}`);
+    }
+    
+    const backupData = await response.json();
+    console.log("Downloaded backup content successfully. Merging...", backupData);
+    
+    // Call merge function in app.js
+    let merged = false;
+    if (typeof mergePulseFitData === 'function') {
+      merged = mergePulseFitData(backupData);
+    }
+    
+    if (merged) {
+      console.log("Local data updated with backup data. Uploading merged state back to Drive...");
+      await backupDataToDrive();
+    } else {
+      console.log("No new data to merge. Local state is up to date.");
+    }
+    
+    return true;
+  } catch (err) {
+    console.error('PulseFit sync/pull failed:', err);
+    return false;
   }
 }

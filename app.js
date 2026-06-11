@@ -350,6 +350,34 @@ function initUI() {
     if (typeof viewDriveLog === 'function') viewDriveLog();
   });
   
+  document.getElementById('sync-gdrive-data-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('sync-gdrive-data-btn');
+    const originalHTML = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      
+      if (typeof pullAndMergeDataFromDrive === 'function') {
+        const success = await pullAndMergeDataFromDrive();
+        if (success) {
+          alert('Synchronization complete! All workouts and nutrition logs have been synced.');
+          renderNutritionTab();
+          renderHistory();
+          renderRoutineTemplates();
+        } else {
+          alert('Synchronization failed. Please check your network and Google Drive connection.');
+        }
+      }
+    } catch (err) {
+      console.error("Manual sync failed:", err);
+      alert(`Sync Error: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
+  
   // Active Workout Buttons
   document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
   renderRoutineTemplates();
@@ -1056,6 +1084,9 @@ function finishActiveWorkout() {
     syncWorkoutToDrive(finalWorkout).then(syncSuccess => {
       if (syncSuccess) {
         alert('Workout saved locally and successfully synced to Google Drive!');
+        if (typeof backupDataToDrive === 'function') {
+          backupDataToDrive();
+        }
       } else {
         alert('Workout saved locally, but Google Drive sync failed. Please check your credentials in Settings.');
       }
@@ -1837,6 +1868,10 @@ function saveNutritionTargets() {
   
   alert("Nutrition targets saved!");
   renderNutritionTab();
+  
+  if (typeof backupDataToDrive === 'function') {
+    backupDataToDrive();
+  }
 }
 
 function updateSheetStatusUI(status) {
@@ -2251,6 +2286,9 @@ async function handleLogFood() {
     if (typeof syncNutritionToDrive === 'function') {
       await syncNutritionToDrive(nutritionLog);
     }
+    if (typeof backupDataToDrive === 'function') {
+      await backupDataToDrive();
+    }
     
   } catch (error) {
     console.error("Error logging food:", error);
@@ -2411,6 +2449,9 @@ async function deleteFoodLogItem(dateStr, itemId) {
     if (typeof syncNutritionToDrive === 'function') {
       await syncNutritionToDrive(nutritionLog);
     }
+    if (typeof backupDataToDrive === 'function') {
+      await backupDataToDrive();
+    }
   }
 }
 
@@ -2423,5 +2464,95 @@ async function deleteEntireDayLog(dateStr) {
     if (typeof syncNutritionToDrive === 'function') {
       await syncNutritionToDrive(nutritionLog);
     }
+    if (typeof backupDataToDrive === 'function') {
+      await backupDataToDrive();
+    }
   }
+}
+
+// --- Two-Way Conflict-Free Data Merger ---
+function mergePulseFitData(backupData) {
+  let changed = false;
+
+  // 1. Merge settings (sync basic options but preserve local Client ID / API Key)
+  if (backupData.settings) {
+    const s = backupData.settings;
+    if (s.weightUnit && s.weightUnit !== settings.weightUnit) {
+      settings.weightUnit = s.weightUnit;
+      changed = true;
+    }
+    if (s.defaultRest && s.defaultRest !== settings.defaultRest) {
+      settings.defaultRest = s.defaultRest;
+      changed = true;
+    }
+    if (s.timerSound !== undefined && s.timerSound !== settings.timerSound) {
+      settings.timerSound = s.timerSound;
+      changed = true;
+    }
+  }
+
+  // 2. Merge nutritionTargets
+  if (backupData.nutritionTargets) {
+    const backupT = backupData.nutritionTargets;
+    if (JSON.stringify(nutritionTargets) !== JSON.stringify(backupT)) {
+      nutritionTargets = backupT;
+      changed = true;
+    }
+  }
+
+  // 3. Merge workoutHistory (by unique ID)
+  if (backupData.workoutHistory && Array.isArray(backupData.workoutHistory)) {
+    const localIds = new Set(workoutHistory.map(w => w.id));
+    backupData.workoutHistory.forEach(w => {
+      if (!localIds.has(w.id)) {
+        workoutHistory.push(w);
+        changed = true;
+      }
+    });
+  }
+
+  // 4. Merge nutritionLog (by date and logged food item ID)
+  if (backupData.nutritionLog && typeof backupData.nutritionLog === 'object') {
+    Object.keys(backupData.nutritionLog).forEach(date => {
+      const backupDay = backupData.nutritionLog[date];
+      if (!nutritionLog[date]) {
+        nutritionLog[date] = backupDay;
+        changed = true;
+      } else {
+        const localDay = nutritionLog[date];
+        const localItemIds = new Set(localDay.items.map(item => item.id));
+        let dayChanged = false;
+        backupDay.items.forEach(item => {
+          if (!localItemIds.has(item.id)) {
+            localDay.items.push(item);
+            dayChanged = true;
+            changed = true;
+          }
+        });
+        if (dayChanged) {
+          recalculateDayTotals(date);
+        }
+      }
+    });
+  }
+
+  // 5. Merge custom exercises
+  if (backupData.exercises && Array.isArray(backupData.exercises)) {
+    const localIds = new Set(exercises.map(e => e.id));
+    backupData.exercises.forEach(e => {
+      if (!localIds.has(e.id)) {
+        exercises.push(e);
+        changed = true;
+      }
+    });
+  }
+
+  if (changed) {
+    saveSettings();
+    saveExercises();
+    saveHistory();
+    saveNutritionLog();
+  }
+  
+  return changed;
 }

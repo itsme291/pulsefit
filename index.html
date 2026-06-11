@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=11">
+  <link rel="stylesheet" href="styles.css?v=12">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=11" defer></script>
-  <script src="gemini.js?v=11" defer></script>
-  <script src="app.js?v=11" defer></script>
+  <script src="gdrive.js?v=12" defer></script>
+  <script src="gemini.js?v=12" defer></script>
+  <script src="app.js?v=12" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -531,10 +531,13 @@
             </div>
             
             <div class="gdrive-actions-panel margin-top-15" style="display:flex; gap:10px;">
-              <button class="btn btn-outline-secondary btn-sm" id="view-gdrive-log-btn" style="flex-grow:1;" disabled>
-                <i data-lucide="file-text"></i> View Log File
-              </button>
-            </div>
+               <button class="btn btn-outline-secondary btn-sm" id="view-gdrive-log-btn" style="flex-grow:1;" disabled>
+                 <i data-lucide="file-text"></i> View Log File
+               </button>
+               <button class="btn btn-outline-primary btn-sm" id="sync-gdrive-data-btn" style="flex-grow:1;" disabled>
+                 <i data-lucide="refresh-cw"></i> Sync Data
+               </button>
+             </div>
             
             <button class="btn-secondary-text btn-xs margin-top-15" id="toggle-gdrive-help" style="text-align:left;display:flex;align-items:center;gap:4px;cursor:pointer;">
               <i data-lucide="help-circle" style="width:12px;height:12px;"></i> How to get a Google Client ID?
