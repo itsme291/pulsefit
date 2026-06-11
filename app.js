@@ -196,11 +196,20 @@ function initUI() {
     resultSpan.style.color = 'var(--text-muted)';
     
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${keyValue}`);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${keyValue}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': keyValue
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: 'ping' }] }]
+        })
+      });
       const data = await response.json();
       
       if (response.ok) {
-        resultSpan.textContent = 'Success! Key is active.';
+        resultSpan.textContent = 'Success! Key is active and responding.';
         resultSpan.style.color = '#10b981'; // green
       } else {
         const errMsg = data.error?.message || response.statusText || 'Unknown Error';
