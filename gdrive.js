@@ -377,3 +377,146 @@ async function viewDriveLog() {
     contentEl.textContent = `Failed to retrieve Google Doc log from Google Drive.\n\nDetails:\n${err.message || err}`;
   }
 }
+
+// --- Sync Daily Macros Log with Google Doc PulseFit_macros ---
+async function syncNutritionToDrive(nutritionLog) {
+  if (!isGDriveConnected()) {
+    console.warn('Google Drive not authorized or expired. Macros sync skipped.');
+    updateMacrosSyncStatus('Disconnected');
+    return false;
+  }
+  
+  try {
+    updateMacrosSyncStatus('Syncing...');
+    
+    // Ensure token is registered with GAPI client
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
+    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderId = await getOrCreateFolder(folderName);
+    
+    console.log(`Searching for Google Doc 'PulseFit_macros' in folder '${folderName}'...`);
+    
+    // 1. Search for existing Google Doc in parent folder
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = 'PulseFit_macros' and mimeType = 'application/vnd.google-apps.document' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchResponse.result.files;
+    let fileId = null;
+    
+    // 2. Format the entire nutrition logs ledger
+    let ledger = `PULSEFIT NUTRITION & MACROS LOG\n`;
+    ledger += `===============================\n`;
+    ledger += `This document stores your daily nutrition and macro logs. Your Gemini AI Workspace extension reads this file to analyze your diet.\n\n`;
+    ledger += `Daily Logs:\n\n`;
+    
+    // Sort dates descending (newest first)
+    const dates = Object.keys(nutritionLog).sort((a, b) => b.localeCompare(a));
+    
+    if (dates.length === 0) {
+      ledger += `No food logs recorded yet.\n`;
+    } else {
+      dates.forEach(date => {
+        const dayLog = nutritionLog[date];
+        const displayDate = new Date(date + "T00:00:00").toLocaleDateString(undefined, {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+        
+        ledger += `--------------------------------------------------\n`;
+        ledger += `Date: ${displayDate} (${date})\n`;
+        ledger += `Daily Totals: Carbs: ${dayLog.totals.carbs.toFixed(1)}g | Protein: ${dayLog.totals.protein.toFixed(1)}g | Fat: ${dayLog.totals.fat.toFixed(1)}g | Calories: ${dayLog.totals.calories.toFixed(1)} kcal\n`;
+        ledger += `Foods Logged:\n`;
+        
+        if (dayLog.items && dayLog.items.length > 0) {
+          dayLog.items.forEach(item => {
+            ledger += `  * ${item.name}: ${item.carbs.toFixed(1)}g C, ${item.protein.toFixed(1)}g P, ${item.fat.toFixed(1)}g F, ${item.calories.toFixed(1)} kcal (Source: ${item.source || 'Internet'})\n`;
+          });
+        } else {
+          ledger += `  (No items recorded for this day)\n`;
+        }
+        ledger += `--------------------------------------------------\n\n`;
+      });
+    }
+    
+    if (files && files.length > 0) {
+      fileId = files[0].id;
+      console.log('Clearing and updating existing Google Doc PulseFit_macros...');
+      
+      // Clear Doc content first
+      const docResponse = await gapi.client.docs.documents.get({ documentId: fileId });
+      const bodyContent = docResponse.result.body.content;
+      const lastElement = bodyContent[bodyContent.length - 1];
+      const endIndex = Math.max(1, lastElement.endIndex - 1);
+      
+      const requests = [];
+      if (endIndex > 1) {
+        requests.push({
+          deleteContentRange: {
+            range: {
+              startIndex: 1,
+              endIndex: endIndex
+            }
+          }
+        });
+      }
+      requests.push({
+        insertText: {
+          location: {
+            index: 1
+          },
+          text: ledger
+        }
+      });
+      
+      await gapi.client.docs.documents.batchUpdate({
+        documentId: fileId,
+        resource: { requests }
+      });
+      
+    } else {
+      // Create Doc
+      const createResponse = await gapi.client.drive.files.create({
+        resource: {
+          name: 'PulseFit_macros',
+          mimeType: 'application/vnd.google-apps.document',
+          parents: [folderId]
+        },
+        fields: 'id'
+      });
+      
+      fileId = createResponse.result.id;
+      console.log('Created new Google Doc PulseFit_macros in GDrive folder...');
+      
+      await appendDocContent(fileId, ledger);
+    }
+    
+    console.log('Macros successfully synced to Google Doc!');
+    updateMacrosSyncStatus('Synced');
+    return true;
+    
+  } catch (err) {
+    console.error('Macros Doc Sync Error:', err);
+    updateMacrosSyncStatus('Sync Failed');
+    return false;
+  }
+}
+
+function updateMacrosSyncStatus(statusText) {
+  const pill = document.getElementById('macros-doc-sync-pill');
+  const textEl = document.getElementById('macros-doc-sync-text');
+  if (!pill || !textEl) return;
+  
+  textEl.textContent = `Sync: ${statusText}`;
+  
+  if (statusText === 'Synced') {
+    pill.className = 'api-status-pill success';
+  } else if (statusText === 'Syncing...') {
+    pill.className = 'api-status-pill success';
+  } else {
+    pill.className = 'api-status-pill error';
+  }
+}

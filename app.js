@@ -93,6 +93,7 @@ let analyticsChart = null;
 document.addEventListener('DOMContentLoaded', () => {
   loadData();
   initUI();
+  initNutrition();
   lucide.createIcons();
 });
 
@@ -319,6 +320,9 @@ function switchTab(tabId) {
     } else if (tabId === 'tab-coach') {
       pageTitle.textContent = 'Gemini Fitness Coach';
       initGeminiCoachUI();
+    } else if (tabId === 'tab-nutrition') {
+      pageTitle.textContent = 'Nutrition & Macros';
+      renderNutritionTab();
     }
   }
 }
@@ -1561,4 +1565,467 @@ function renderRoutineTemplates() {
     
     grid.appendChild(card);
   });
+}
+
+// ==========================================================================
+// Nutrition Tracking & Macro Synchronization Logic
+// ==========================================================================
+
+// --- Nutrition Tracking State ---
+let nutritionLog = {};
+let nutritionTargets = { calories: 2000, protein: 130, carbs: 200, fat: 70 };
+let sheetFoods = [];
+let foodImageBase64 = null;
+let foodImageMimeType = null;
+
+function initNutrition() {
+  loadNutritionData();
+  
+  const saveTargetsBtn = document.getElementById('save-nutrition-targets-btn');
+  if (saveTargetsBtn) {
+    saveTargetsBtn.addEventListener('click', saveNutritionTargets);
+  }
+  
+  const syncSheetBtn = document.getElementById('refresh-sheet-btn');
+  if (syncSheetBtn) {
+    syncSheetBtn.addEventListener('click', () => {
+      fetchGoogleSheetFoods();
+    });
+  }
+  
+  const logFoodBtn = document.getElementById('log-food-btn');
+  if (logFoodBtn) {
+    logFoodBtn.addEventListener('click', handleLogFood);
+  }
+  
+  const uploadZone = document.getElementById('photo-upload-zone');
+  const imageInput = document.getElementById('food-image-input');
+  const removePreviewBtn = document.getElementById('btn-remove-preview');
+  
+  if (uploadZone && imageInput) {
+    uploadZone.addEventListener('click', (e) => {
+      if (e.target.closest('#btn-remove-preview')) return;
+      imageInput.click();
+    });
+    imageInput.addEventListener('change', handleFoodImageSelect);
+  }
+  
+  if (removePreviewBtn) {
+    removePreviewBtn.addEventListener('click', clearFoodImagePreview);
+  }
+  
+  fetchGoogleSheetFoods();
+}
+
+function loadNutritionData() {
+  const storedTargets = localStorage.getItem('pulsefit_nutrition_targets');
+  if (storedTargets) {
+    nutritionTargets = JSON.parse(storedTargets);
+  }
+  
+  document.getElementById('target-calories-input').value = nutritionTargets.calories;
+  document.getElementById('target-protein-input').value = nutritionTargets.protein;
+  document.getElementById('target-carbs-input').value = nutritionTargets.carbs;
+  document.getElementById('target-fat-input').value = nutritionTargets.fat;
+  
+  const storedLogs = localStorage.getItem('pulsefit_nutrition_log');
+  if (storedLogs) {
+    nutritionLog = JSON.parse(storedLogs);
+  }
+  
+  const cachedFoods = localStorage.getItem('pulsefit_sheet_foods');
+  if (cachedFoods) {
+    sheetFoods = JSON.parse(cachedFoods);
+    updateSheetStatusUI('success');
+  }
+}
+
+function saveNutritionTargets() {
+  const cal = parseInt(document.getElementById('target-calories-input').value);
+  const pro = parseInt(document.getElementById('target-protein-input').value);
+  const carb = parseInt(document.getElementById('target-carbs-input').value);
+  const fat = parseInt(document.getElementById('target-fat-input').value);
+  
+  if (isNaN(cal) || isNaN(pro) || isNaN(carb) || isNaN(fat)) {
+    alert("Please enter valid numeric values for targets.");
+    return;
+  }
+  
+  nutritionTargets = { calories: cal, protein: pro, carbs: carb, fat: fat };
+  localStorage.setItem('pulsefit_nutrition_targets', JSON.stringify(nutritionTargets));
+  
+  alert("Nutrition targets saved!");
+  renderNutritionTab();
+}
+
+function updateSheetStatusUI(status) {
+  const badge = document.getElementById('sheet-status-badge');
+  const textEl = document.getElementById('sheet-status-text');
+  if (!badge || !textEl) return;
+  
+  if (status === 'success') {
+    textEl.textContent = 'Sheet: Synced';
+    badge.className = 'gdrive-status-badge connected';
+  } else if (status === 'cached') {
+    textEl.textContent = 'Sheet: Offline Cache';
+    badge.className = 'gdrive-status-badge connected';
+  } else if (status === 'error') {
+    textEl.textContent = 'Sheet: Sync Failed';
+    badge.className = 'gdrive-status-badge disconnected';
+  } else {
+    textEl.textContent = 'Sheet: Loading...';
+    badge.className = 'gdrive-status-badge disconnected';
+  }
+}
+
+async function fetchGoogleSheetFoods() {
+  updateSheetStatusUI('loading');
+  const url = "https://docs.google.com/spreadsheets/d/1qnftLt1842tN1A8OhhJDW7ylH6mahN4ut7LlWfKxJnU/export?format=csv&gid=1729071175";
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const csvText = await response.text();
+    parseSheetCSV(csvText);
+    
+    localStorage.setItem('pulsefit_sheet_foods', JSON.stringify(sheetFoods));
+    updateSheetStatusUI('success');
+  } catch (error) {
+    console.error("Failed to fetch sheet foods, loading from cache...", error);
+    const cached = localStorage.getItem('pulsefit_sheet_foods');
+    if (cached) {
+      sheetFoods = JSON.parse(cached);
+      updateSheetStatusUI('cached');
+    } else {
+      updateSheetStatusUI('error');
+    }
+  }
+}
+
+function parseSheetCSV(csvText) {
+  const lines = csvText.split('\n');
+  const parsed = [];
+  
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    const cols = parseCSVLine(line);
+    if (cols.length < 5) continue;
+    
+    const food = cols[0].trim();
+    if (!food || food === "Food") continue;
+    
+    const carb = parseFloat(cols[1]);
+    const protein = parseFloat(cols[2]);
+    const fat = parseFloat(cols[3]);
+    const calories = parseFloat(cols[4]);
+    const unit = cols[5] ? cols[5].trim() : "";
+    
+    parsed.push({
+      name: food,
+      carbs: isNaN(carb) ? 0 : carb,
+      protein: isNaN(protein) ? 0 : protein,
+      fat: isNaN(fat) ? 0 : fat,
+      calories: isNaN(calories) ? 0 : calories,
+      unit: unit
+    });
+  }
+  sheetFoods = parsed;
+}
+
+function parseCSVLine(text) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function handleFoodImageSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  foodImageMimeType = file.type;
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const rawBase64 = event.target.result;
+    const commaIdx = rawBase64.indexOf(',');
+    foodImageBase64 = rawBase64.substring(commaIdx + 1);
+    
+    const previewContainer = document.getElementById('image-preview-container');
+    const previewImg = document.getElementById('image-preview');
+    if (previewContainer && previewImg) {
+      previewImg.src = rawBase64;
+      previewContainer.classList.remove('hidden');
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearFoodImagePreview() {
+  foodImageBase64 = null;
+  foodImageMimeType = null;
+  
+  const fileInput = document.getElementById('food-image-input');
+  if (fileInput) fileInput.value = '';
+  
+  const previewContainer = document.getElementById('image-preview-container');
+  if (previewContainer) {
+    previewContainer.classList.add('hidden');
+  }
+}
+
+async function handleLogFood() {
+  const textInput = document.getElementById('food-input-text').value.trim();
+  
+  if (!textInput && !foodImageBase64) {
+    alert("Please enter a food description or upload a photo.");
+    return;
+  }
+  
+  if (!settings.apiKey || !settings.apiKey.startsWith('AIzaSy')) {
+    alert("Please enter a valid Gemini API Key in Settings first.");
+    openSettingsModal();
+    return;
+  }
+  
+  const overlay = document.getElementById('nutrition-loading-overlay');
+  const overlayText = document.getElementById('loading-overlay-text');
+  if (overlay) {
+    overlayText.textContent = foodImageBase64 ? "Analyzing photo & calculating macros..." : "Pulse Coach is parsing macros...";
+    overlay.classList.remove('hidden');
+  }
+  
+  try {
+    const parsedItems = await parseFoodEntryWithGemini(
+      textInput, 
+      foodImageBase64, 
+      foodImageMimeType, 
+      sheetFoods
+    );
+    
+    if (!Array.isArray(parsedItems) || parsedItems.length === 0) {
+      throw new Error("No food items parsed by Gemini. Try describing the foods more clearly.");
+    }
+    
+    const todayStr = getLocalDateString();
+    if (!nutritionLog[todayStr]) {
+      nutritionLog[todayStr] = {
+        dateStr: todayStr,
+        items: [],
+        totals: { carbs: 0, protein: 0, fat: 0, calories: 0 }
+      };
+    }
+    
+    const dayLog = nutritionLog[todayStr];
+    parsedItems.forEach(item => {
+      dayLog.items.push({
+        id: 'food-' + Date.now() + '-' + Math.floor(Math.random() * 1000),
+        time: Date.now(),
+        name: item.name || item.matchedFood || "Logged Food",
+        carbs: item.carbs || 0,
+        protein: item.protein || 0,
+        fat: item.fat || 0,
+        calories: item.calories || 0,
+        source: item.source || "Internet"
+      });
+    });
+    
+    recalculateDayTotals(todayStr);
+    saveNutritionLog();
+    
+    document.getElementById('food-input-text').value = '';
+    clearFoodImagePreview();
+    
+    renderNutritionTab();
+    
+    if (typeof syncNutritionToDrive === 'function') {
+      await syncNutritionToDrive(nutritionLog);
+    }
+    
+  } catch (error) {
+    console.error("Error logging food:", error);
+    alert(`Failed to log food: ${error.message || error}`);
+  } finally {
+    if (overlay) overlay.classList.add('hidden');
+  }
+}
+
+function getLocalDateString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function recalculateDayTotals(dateStr) {
+  const dayLog = nutritionLog[dateStr];
+  if (!dayLog) return;
+  
+  let carbs = 0, protein = 0, fat = 0, calories = 0;
+  dayLog.items.forEach(item => {
+    carbs += item.carbs;
+    protein += item.protein;
+    fat += item.fat;
+    calories += item.calories;
+  });
+  dayLog.totals = { carbs, protein, fat, calories };
+}
+
+function saveNutritionLog() {
+  localStorage.setItem('pulsefit_nutrition_log', JSON.stringify(nutritionLog));
+}
+
+function renderNutritionTab() {
+  const todayStr = getLocalDateString();
+  const dayLog = nutritionLog[todayStr] || {
+    items: [],
+    totals: { carbs: 0, protein: 0, fat: 0, calories: 0 }
+  };
+  
+  document.getElementById('nutrition-calories-target').textContent = nutritionTargets.calories;
+  document.getElementById('nutrition-protein-target').textContent = nutritionTargets.protein;
+  document.getElementById('nutrition-carbs-target').textContent = nutritionTargets.carbs;
+  document.getElementById('nutrition-fat-target').textContent = nutritionTargets.fat;
+  
+  document.getElementById('nutrition-calories-current').textContent = Math.round(dayLog.totals.calories);
+  document.getElementById('nutrition-protein-current').textContent = Math.round(dayLog.totals.protein);
+  document.getElementById('nutrition-carbs-current').textContent = Math.round(dayLog.totals.carbs);
+  document.getElementById('nutrition-fat-current').textContent = Math.round(dayLog.totals.fat);
+  
+  const ring = document.getElementById('calories-progress-ring');
+  if (ring) {
+    const radius = ring.r.baseVal.value;
+    const circumference = 2 * Math.PI * radius;
+    ring.style.strokeDasharray = `${circumference} ${circumference}`;
+    
+    const percent = Math.min(100, (dayLog.totals.calories / nutritionTargets.calories) * 100);
+    const offset = circumference - (percent / 100) * circumference;
+    ring.style.strokeDashoffset = isNaN(offset) ? circumference : offset;
+  }
+  
+  const pPercent = Math.min(100, (dayLog.totals.protein / nutritionTargets.protein) * 100);
+  const cPercent = Math.min(100, (dayLog.totals.carbs / nutritionTargets.carbs) * 100);
+  const fPercent = Math.min(100, (dayLog.totals.fat / nutritionTargets.fat) * 100);
+  
+  document.getElementById('nutrition-protein-bar').style.width = `${pPercent}%`;
+  document.getElementById('nutrition-carbs-bar').style.width = `${cPercent}%`;
+  document.getElementById('nutrition-fat-bar').style.width = `${fPercent}%`;
+  
+  const todayList = document.getElementById('today-food-log-list');
+  const summaryEl = document.getElementById('today-log-summary');
+  
+  todayList.innerHTML = '';
+  
+  if (dayLog.items.length === 0) {
+    todayList.innerHTML = `<p style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center;">No foods logged today yet.</p>`;
+  } else {
+    dayLog.items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'today-log-item';
+      const badgeClass = item.source.toLowerCase() === 'sheet' ? 'sheet' : 'internet';
+      el.innerHTML = `
+        <div class="today-log-item-info">
+          <div class="today-log-item-title">
+            <span>${item.name}</span>
+            <span class="today-log-item-source-badge ${badgeClass}">${item.source}</span>
+          </div>
+          <div class="today-log-item-macros">
+            ${item.carbs.toFixed(1)}g C &bull; ${item.protein.toFixed(1)}g P &bull; ${item.fat.toFixed(1)}g F &bull; ${Math.round(item.calories)} kcal
+          </div>
+        </div>
+        <button class="btn-delete-log-item" onclick="deleteFoodLogItem('${todayStr}', '${item.id}')" title="Delete Entry">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+        </button>
+      `;
+      todayList.appendChild(el);
+    });
+  }
+  
+  summaryEl.textContent = `Daily Intake Summary: ${Math.round(dayLog.totals.calories)} kcal | ${dayLog.totals.protein.toFixed(1)}g P | ${dayLog.totals.carbs.toFixed(1)}g C | ${dayLog.totals.fat.toFixed(1)}g F`;
+  
+  renderNutritionHistoryTable();
+  lucide.createIcons();
+}
+
+function renderNutritionHistoryTable() {
+  const tbody = document.getElementById('nutrition-history-table-body');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  
+  const dates = Object.keys(nutritionLog).sort((a, b) => b.localeCompare(a));
+  
+  if (dates.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);padding:20px;">No historical logs available.</td></tr>`;
+    return;
+  }
+  
+  dates.forEach(date => {
+    const dayLog = nutritionLog[date];
+    const tr = document.createElement('tr');
+    const mealsText = dayLog.items.map(item => item.name).join(', ');
+    const displayDate = new Date(date + "T00:00:00").toLocaleDateString(undefined, {
+      weekday: 'short', month: 'short', day: 'numeric'
+    });
+    
+    tr.innerHTML = `
+      <td style="padding:12px 8px;font-weight:600;">${displayDate}</td>
+      <td class="center" style="padding:12px 8px;">${Math.round(dayLog.totals.calories)} kcal</td>
+      <td class="center" style="padding:12px 8px;">${Math.round(dayLog.totals.protein)}g</td>
+      <td class="center" style="padding:12px 8px;">${Math.round(dayLog.totals.carbs)}g</td>
+      <td class="center" style="padding:12px 8px;">${Math.round(dayLog.totals.fat)}g</td>
+      <td style="padding:12px 8px;font-size:12px;color:var(--text-secondary);max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${mealsText}">${mealsText}</td>
+      <td class="center" style="padding:12px 8px;">
+        <button class="btn btn-outline-danger btn-xs" onclick="deleteEntireDayLog('${date}')" title="Delete Day's Log" style="padding:4px 8px;font-size:10px;">Delete</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+async function deleteFoodLogItem(dateStr, itemId) {
+  const dayLog = nutritionLog[dateStr];
+  if (!dayLog) return;
+  
+  const idx = dayLog.items.findIndex(item => item.id === itemId);
+  if (idx !== -1) {
+    dayLog.items.splice(idx, 1);
+    if (dayLog.items.length === 0) {
+      delete nutritionLog[dateStr];
+    } else {
+      recalculateDayTotals(dateStr);
+    }
+    saveNutritionLog();
+    renderNutritionTab();
+    
+    if (typeof syncNutritionToDrive === 'function') {
+      await syncNutritionToDrive(nutritionLog);
+    }
+  }
+}
+
+async function deleteEntireDayLog(dateStr) {
+  if (confirm(`Delete the entire food log for ${dateStr}?`)) {
+    delete nutritionLog[dateStr];
+    saveNutritionLog();
+    renderNutritionTab();
+    
+    if (typeof syncNutritionToDrive === 'function') {
+      await syncNutritionToDrive(nutritionLog);
+    }
+  }
 }

@@ -461,3 +461,104 @@ function escapeHTML(str) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
 }
+
+// --- Parse Food Entry using Gemini API (supports Text & Photo) ---
+async function parseFoodEntryWithGemini(textInput, base64Image, mimeType, sheetFoodsList) {
+  if (!settings.apiKey || !settings.apiKey.startsWith('AIzaSy')) {
+    throw new Error("Invalid or missing Gemini API Key. Please add it in Settings.");
+  }
+  
+  // Convert sheetFoodsList to a compact CSV or JSON format for prompt context
+  let sheetContext = "Food,Carb (gm),Protein (gm),Fat (gm),Calories,Unit\n";
+  sheetFoodsList.forEach(f => {
+    sheetContext += `${f.name},${f.carbs},${f.protein},${f.fat},${f.calories},${f.unit}\n`;
+  });
+
+  const systemInstruction = `You are a precise nutrition and macro calculator. Your job is to analyze the user's food log input (which may be a text description, a photo of the food, or both) and output a JSON array of the food items found.
+
+Rules:
+1. We have a reference database of foods from a Google Sheet with their macros. You must check this list first. If a food item matches (exact or fuzzy), you MUST use these exact macro ratios.
+Here is the Google Sheet database (CSV format):
+${sheetContext}
+
+2. Scale the macros based on the quantity specified. 
+   - If the unit in the sheet is empty or "1 gm", "1 gram", or similar cooked weights, the macros are listed per gram. For example, if Oats is 4.0 kcal/g and the user eats 50g, multiply by 50.
+   - If the unit is "1 piece", "1 count", "1 slice", "1 scoop", "cup", etc., the macros are listed per that unit. For example, if Roti is 105.2 kcal and they eat 2, multiply by 2.
+   - For items where the sheet has a specific weight unit (e.g. Almonds (weight) is per gram), match carefully.
+
+3. If the food is NOT in the spreadsheet database, estimate its macros using your general nutrition knowledge (the internet). Mark the source as "Internet".
+4. Calculate final macros: carbs (g), protein (g), fat (g), calories (kcal).
+5. Your output must be a valid JSON array of objects representing the food items. Do not include markdown formatting or "json" wrap blocks. Return ONLY the raw JSON.
+
+JSON Structure:
+[
+  {
+    "name": "Food Item Name (e.g. 2 Roti or 100g Paneer)",
+    "matchedFood": "Name of matched food from sheet, or null if from internet",
+    "quantity": "Amount (e.g. 2 pieces, 100g, 1 scoop)",
+    "source": "Sheet" or "Internet",
+    "carbs": 36.0,
+    "protein": 8.0,
+    "fat": 4.0,
+    "calories": 210.4
+  }
+]
+`;
+
+  const contents = [];
+  const parts = [];
+  
+  if (textInput && textInput.trim()) {
+    parts.push({ text: `User meal description: ${textInput}` });
+  }
+  
+  if (base64Image) {
+    parts.push({
+      inlineData: {
+        mimeType: mimeType || 'image/jpeg',
+        data: base64Image
+      }
+    });
+    if (!textInput || !textInput.trim()) {
+      parts.push({ text: "Please identify and calculate the macros for the food items in this photo." });
+    }
+  }
+  
+  contents.push({
+    role: 'user',
+    parts: parts
+  });
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.apiKey}`;
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      contents: contents,
+      systemInstruction: {
+        parts: [{ text: systemInstruction }]
+      },
+      generationConfig: {
+        temperature: 0.1,
+        responseMimeType: "application/json"
+      }
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API returned HTTP ${response.status}`);
+  }
+
+  const result = await response.json();
+  const rawText = result.candidates[0].content.parts[0].text;
+  
+  try {
+    return JSON.parse(rawText);
+  } catch (e) {
+    console.error("Failed to parse JSON response from Gemini:", rawText);
+    throw new Error("Failed to parse nutrition details. Please try again with clearer text or photo.");
+  }
+}
