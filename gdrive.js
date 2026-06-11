@@ -537,29 +537,39 @@ async function syncNutritionToDrive(nutritionLog) {
       const lastElement = bodyContent[bodyContent.length - 1];
       const endIndex = Math.max(1, lastElement.endIndex - 1);
       
-      const requests = [];
       if (endIndex > 1) {
-        requests.push({
-          deleteContentRange: {
-            range: {
-              startIndex: 1,
-              endIndex: endIndex
+        try {
+          await gapi.client.docs.documents.batchUpdate({
+            documentId: fileId,
+            resource: {
+              requests: [{
+                deleteContentRange: {
+                  range: {
+                    startIndex: 1,
+                    endIndex: endIndex
+                  }
+                }
+              }]
             }
-          }
-        });
-      }
-      requests.push({
-        insertText: {
-          location: {
-            index: 1
-          },
-          text: ledger
+          });
+        } catch (delErr) {
+          console.warn('Google Doc clear request failed, will attempt to insert anyway:', delErr);
         }
-      });
+      }
       
+      // Now insert the new content
       await gapi.client.docs.documents.batchUpdate({
         documentId: fileId,
-        resource: { requests }
+        resource: {
+          requests: [{
+            insertText: {
+              location: {
+                index: 1
+              },
+              text: ledger
+            }
+          }]
+        }
       });
       
     } else {
