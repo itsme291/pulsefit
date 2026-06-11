@@ -212,33 +212,51 @@ function initUI() {
         }
       }
       
-      // 2. Perform a test generateContent call using the best available model
-      const testModel = modelsSupported.includes('gemini-3.5-flash') ? 'gemini-3.5-flash' : 
-                          modelsSupported.includes('gemini-2.5-flash') ? 'gemini-2.5-flash' :
-                          modelsSupported.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : 
-                          (modelsSupported.find(m => m.includes('flash')) || 'gemini-3.5-flash');
+      // 2. Perform a test generateContent call using the fallback chain
+      let response = null;
+      let testModel = 'gemini-3.5-flash';
+      let errorDetails = '';
       
-      console.log(`Testing content generation with model: ${testModel}`);
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${keyValue}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': keyValue
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: 'ping' }] }]
-        })
-      });
-      const data = await response.json();
+      const modelsToTry = [
+        modelsSupported.includes('gemini-3.5-flash') ? 'gemini-3.5-flash' : null,
+        modelsSupported.includes('gemini-2.5-flash') ? 'gemini-2.5-flash' : null,
+        modelsSupported.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : null,
+        'gemini-3.5-flash' // default fallback
+      ].filter(m => m !== null);
       
-      if (response.ok) {
+      const uniqueModels = [...new Set(modelsToTry)];
+      
+      for (let model of uniqueModels) {
+        testModel = model;
+        console.log(`Testing content generation with model: ${model}`);
+        try {
+          response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyValue}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': keyValue
+            },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: 'ping' }] }]
+            })
+          });
+          if (response.ok) break;
+          
+          const errJson = await response.json().catch(() => ({}));
+          errorDetails = errJson.error?.message || response.statusText || 'Unknown Error';
+          console.warn(`Test Connection: Failed for ${model} (HTTP ${response.status}): ${errorDetails}`);
+        } catch (err) {
+          errorDetails = err.message;
+          console.warn(`Test Connection: Network error for ${model}: ${errorDetails}`);
+        }
+      }
+      
+      if (response && response.ok) {
         resultSpan.textContent = `Success! (${testModel} active)`;
         resultSpan.style.color = '#10b981'; // green
       } else {
-        const errMsg = data.error?.message || response.statusText || 'Unknown Error';
-        resultSpan.textContent = `Error (${response.status}): ${errMsg}`;
+        resultSpan.textContent = `Error: ${errorDetails || (response ? response.statusText : 'Unknown Error')}`;
         resultSpan.style.color = 'var(--danger)';
-        console.error('Gemini Key Test Failure:', data);
       }
     } catch (err) {
       resultSpan.textContent = `Network Error: ${err.message}`;
