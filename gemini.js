@@ -234,7 +234,7 @@ async function handleUserMessageSend() {
     // Call Gemini API Stream Endpoint with fallback chain
     let response = null;
     let errorDetails = '';
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
     
     for (let model of modelsToTry) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${settings.apiKey}`;
@@ -550,7 +550,7 @@ JSON Structure:
   // Call Gemini API generateContent Endpoint with fallback chain
   let response = null;
   let errorDetails = '';
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
   
   for (let model of modelsToTry) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
