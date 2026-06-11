@@ -20,6 +20,24 @@ Current local time is: ${new Date().toString()}
 `;
 }
 
+// --- Get prioritized models list ---
+function getModelsToTry() {
+  const defaults = [
+    'gemini-2.0-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-flash-latest',
+    'gemini-2.5-flash',
+    'gemini-3.1-flash-lite',
+    'gemini-3.5-flash',
+    'gemini-1.5-flash',
+    'gemini-3-flash-preview'
+  ];
+  if (settings.activeModel && settings.activeModel.trim() !== '') {
+    return [...new Set([settings.activeModel.trim(), ...defaults])];
+  }
+  return defaults;
+}
+
 // --- Format Workout Logs for Gemini ---
 function compileWorkoutContext() {
   if (workoutHistory.length === 0) {
@@ -234,7 +252,7 @@ async function handleUserMessageSend() {
     // Call Gemini API Stream Endpoint with fallback chain
     let response = null;
     let errorDetails = '';
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+    const modelsToTry = getModelsToTry();
     
     for (let model of modelsToTry) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${settings.apiKey}`;
@@ -254,6 +272,10 @@ async function handleUserMessageSend() {
         });
         if (response.ok) {
           console.log(`Successfully connected to Gemini model: ${model}`);
+          if (settings.activeModel !== model) {
+            settings.activeModel = model;
+            if (typeof saveSettings === 'function') saveSettings();
+          }
           break;
         }
         const errJson = await response.json().catch(() => ({}));
@@ -550,7 +572,7 @@ JSON Structure:
   // Call Gemini API generateContent Endpoint with fallback chain
   let response = null;
   let errorDetails = '';
-  const modelsToTry = ['gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+  const modelsToTry = getModelsToTry();
   
   for (let model of modelsToTry) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
@@ -574,6 +596,10 @@ JSON Structure:
       });
       if (response.ok) {
         console.log(`Successfully matched foods with Gemini model: ${model}`);
+        if (settings.activeModel !== model) {
+          settings.activeModel = model;
+          if (typeof saveSettings === 'function') saveSettings();
+        }
         break;
       }
       const errJson = await response.json().catch(() => ({}));

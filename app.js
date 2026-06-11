@@ -76,7 +76,8 @@ let settings = {
   googleFolder: 'PulseFit Workouts',
   weightUnit: 'lbs',
   defaultRest: 90,
-  timerSound: true
+  timerSound: true,
+  activeModel: 'gemini-3.5-flash'
 };
 
 // --- Timer & Visuals State ---
@@ -212,20 +213,36 @@ function initUI() {
         }
       }
       
-      // 2. Perform a test generateContent call using the fallback chain
+      // 2. Build prioritized models list from the supported models
+      const flashModels = modelsSupported.filter(m => m.includes('flash'));
+      const proModels = modelsSupported.filter(m => m.includes('pro'));
+      const otherModels = modelsSupported.filter(m => !m.includes('flash') && !m.includes('pro'));
+      
+      const preferredKeywords = ['3.5-flash', '3.1-flash', '3-flash', '2.5-flash', '2.0-flash', '1.5-flash', 'flash-latest', 'flash-lite', 'flash'];
+      const prioritizedModels = [];
+      
+      for (let keyword of preferredKeywords) {
+        const matches = flashModels.filter(m => m.includes(keyword) && !prioritizedModels.includes(m));
+        prioritizedModels.push(...matches);
+      }
+      
+      flashModels.forEach(m => {
+        if (!prioritizedModels.includes(m)) prioritizedModels.push(m);
+      });
+      
+      prioritizedModels.push(...proModels);
+      prioritizedModels.push(...otherModels);
+      
+      if (prioritizedModels.length === 0) {
+        prioritizedModels.push('gemini-3.5-flash', 'gemini-3.1-flash-lite', 'gemini-2.5-flash', 'gemini-1.5-flash');
+      }
+      
+      const uniqueModels = [...new Set(prioritizedModels)];
+      
+      // 3. Perform a test generateContent call using the fallback chain
       let response = null;
       let testModel = 'gemini-3.5-flash';
       let errorDetails = '';
-      
-      const modelsToTry = [
-        modelsSupported.includes('gemini-3.5-flash') ? 'gemini-3.5-flash' : null,
-        modelsSupported.includes('gemini-3.1-flash-lite') ? 'gemini-3.1-flash-lite' : null,
-        modelsSupported.includes('gemini-2.5-flash') ? 'gemini-2.5-flash' : null,
-        modelsSupported.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : null,
-        'gemini-3.5-flash' // default fallback
-      ].filter(m => m !== null);
-      
-      const uniqueModels = [...new Set(modelsToTry)];
       
       for (let model of uniqueModels) {
         testModel = model;
@@ -253,6 +270,8 @@ function initUI() {
       }
       
       if (response && response.ok) {
+        settings.activeModel = testModel;
+        saveSettings();
         resultSpan.textContent = `Success! (${testModel} active)`;
         resultSpan.style.color = '#10b981'; // green
       } else {
