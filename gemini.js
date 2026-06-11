@@ -67,7 +67,7 @@ function initGeminiCoachUI() {
   
   // Enable/disable send button based on API key & textarea value
   function toggleSendBtn() {
-    const hasKey = settings.apiKey && settings.apiKey.trim().startsWith('AIzaSy');
+    const hasKey = settings.apiKey && settings.apiKey.trim().length > 10;
     sendBtn.disabled = !hasKey || textarea.value.trim() === '';
   }
   
@@ -98,7 +98,7 @@ function initGeminiCoachUI() {
     card.parentNode.replaceChild(newCard, card);
     
     newCard.addEventListener('click', () => {
-      if (!settings.apiKey || !settings.apiKey.trim().startsWith('AIzaSy')) {
+      if (!settings.apiKey || settings.apiKey.trim().length < 10) {
         alert('Please enter a valid Gemini API Key in Settings first.');
         openSettingsModal();
         return;
@@ -464,7 +464,7 @@ function escapeHTML(str) {
 
 // --- Parse Food Entry using Gemini API (supports Text & Photo) ---
 async function parseFoodEntryWithGemini(textInput, base64Image, mimeType, sheetFoodsList) {
-  if (!settings.apiKey || !settings.apiKey.startsWith('AIzaSy')) {
+  if (!settings.apiKey || settings.apiKey.trim().length < 10) {
     throw new Error("Invalid or missing Gemini API Key. Please add it in Settings.");
   }
   

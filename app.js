@@ -331,7 +331,7 @@ function updateAPIStatusPill() {
   const pill = document.getElementById('api-status-pill');
   const text = document.getElementById('api-status-text');
   
-  if (settings.apiKey && settings.apiKey.trim().startsWith('AIzaSy')) {
+  if (settings.apiKey && settings.apiKey.trim().length > 10) {
     pill.className = 'api-status-pill success';
     text.textContent = 'API Key Active';
   } else {
@@ -364,8 +364,8 @@ function saveAPIKey() {
     return;
   }
   
-  if (!keyValue.startsWith('AIzaSy')) {
-    alert('Invalid Gemini API Key format. It should start with "AIzaSy".');
+  if (keyValue.length < 10) {
+    alert('Invalid Gemini API Key. The key appears to be too short.');
     return;
   }
   
@@ -1796,7 +1796,7 @@ async function handleLogFood() {
     return;
   }
   
-  if (!settings.apiKey || !settings.apiKey.startsWith('AIzaSy')) {
+  if (!settings.apiKey || settings.apiKey.trim().length < 10) {
     alert("Please enter a valid Gemini API Key in Settings first.");
     openSettingsModal();
     return;
