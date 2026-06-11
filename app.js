@@ -1683,7 +1683,7 @@ function renderRoutineTemplates() {
 
 // --- Nutrition Tracking State ---
 let nutritionLog = {};
-let nutritionTargets = { calories: 2000, protein: 130, carbs: 200, fat: 70 };
+let nutritionTargets = { calories: 1950, protein: 130, carbs: 200, fat: 70 };
 let sheetFoods = [];
 let foodImageBase64 = null;
 let foodImageMimeType = null;
@@ -1754,7 +1754,32 @@ function initNutrition() {
     cameraShutterBtn.addEventListener('click', capturePhoto);
   }
   
+  // Set up auto calorie calculation from macro inputs
+  const proteinInput = document.getElementById('target-protein-input');
+  const carbsInput = document.getElementById('target-carbs-input');
+  const fatInput = document.getElementById('target-fat-input');
+  if (proteinInput && carbsInput && fatInput) {
+    proteinInput.addEventListener('input', updateTargetCaloriesFromInputs);
+    carbsInput.addEventListener('input', updateTargetCaloriesFromInputs);
+    fatInput.addEventListener('input', updateTargetCaloriesFromInputs);
+  }
+  
   fetchGoogleSheetFoods();
+}
+
+function updateTargetCaloriesFromInputs() {
+  const proteinInput = document.getElementById('target-protein-input');
+  const carbsInput = document.getElementById('target-carbs-input');
+  const fatInput = document.getElementById('target-fat-input');
+  const calInput = document.getElementById('target-calories-input');
+  
+  if (proteinInput && carbsInput && fatInput && calInput) {
+    const pro = parseInt(proteinInput.value) || 0;
+    const carb = parseInt(carbsInput.value) || 0;
+    const fat = parseInt(fatInput.value) || 0;
+    const cal = (pro * 4) + (carb * 4) + (fat * 9);
+    calInput.value = cal;
+  }
 }
 
 function loadNutritionData() {
@@ -1763,10 +1788,23 @@ function loadNutritionData() {
     nutritionTargets = JSON.parse(storedTargets);
   }
   
-  document.getElementById('target-calories-input').value = nutritionTargets.calories;
-  document.getElementById('target-protein-input').value = nutritionTargets.protein;
-  document.getElementById('target-carbs-input').value = nutritionTargets.carbs;
-  document.getElementById('target-fat-input').value = nutritionTargets.fat;
+  const calInput = document.getElementById('target-calories-input');
+  const proInput = document.getElementById('target-protein-input');
+  const carbInput = document.getElementById('target-carbs-input');
+  const fatInput = document.getElementById('target-fat-input');
+  
+  if (calInput) calInput.value = nutritionTargets.calories;
+  if (proInput) proInput.value = nutritionTargets.protein;
+  if (carbInput) carbInput.value = nutritionTargets.carbs;
+  if (fatInput) fatInput.value = nutritionTargets.fat;
+  
+  // Trigger initial calculation to ensure math is consistent
+  updateTargetCaloriesFromInputs();
+  
+  // Update state with the calculated calories value
+  if (calInput) {
+    nutritionTargets.calories = parseInt(calInput.value) || 1950;
+  }
   
   const storedLogs = localStorage.getItem('pulsefit_nutrition_log');
   if (storedLogs) {
@@ -1781,6 +1819,9 @@ function loadNutritionData() {
 }
 
 function saveNutritionTargets() {
+  // Ensure the inputs are fully computed before saving
+  updateTargetCaloriesFromInputs();
+  
   const cal = parseInt(document.getElementById('target-calories-input').value);
   const pro = parseInt(document.getElementById('target-protein-input').value);
   const carb = parseInt(document.getElementById('target-carbs-input').value);

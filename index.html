@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=10" defer></script>
-  <script src="gemini.js?v=10" defer></script>
-  <script src="app.js?v=10" defer></script>
+  <script src="gdrive.js?v=11" defer></script>
+  <script src="gemini.js?v=11" defer></script>
+  <script src="app.js?v=11" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -253,7 +253,7 @@
               <div class="target-inputs-grid">
                 <div class="target-input-item">
                   <label for="target-calories-input">Calories (kcal)</label>
-                  <input type="number" id="target-calories-input" value="2000">
+                  <input type="number" id="target-calories-input" value="1950" readonly style="background: rgba(255, 255, 255, 0.05); cursor: not-allowed; border-color: rgba(255, 255, 255, 0.08);" title="Calculated automatically based on Protein, Carbs, and Fat">
                 </div>
                 <div class="target-input-item">
                   <label for="target-protein-input">Protein (g)</label>
