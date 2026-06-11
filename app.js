@@ -1909,7 +1909,7 @@ function renderNutritionTab() {
   
   const ring = document.getElementById('calories-progress-ring');
   if (ring) {
-    const radius = ring.r.baseVal.value;
+    const radius = parseFloat(ring.getAttribute('r')) || 60;
     const circumference = 2 * Math.PI * radius;
     ring.style.strokeDasharray = `${circumference} ${circumference}`;
     
