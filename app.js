@@ -185,18 +185,41 @@ function initUI() {
     const keyInput = document.getElementById('settings-api-key');
     const keyValue = keyInput.value.trim();
     const resultSpan = document.getElementById('api-key-test-result');
+    const modelsListDiv = document.getElementById('api-key-models-list');
     
     if (keyValue === '') {
       resultSpan.textContent = 'Please enter a key first.';
       resultSpan.style.color = 'var(--danger)';
+      if (modelsListDiv) modelsListDiv.style.display = 'none';
       return;
     }
     
     resultSpan.textContent = 'Testing connection...';
     resultSpan.style.color = 'var(--text-muted)';
+    if (modelsListDiv) modelsListDiv.style.display = 'none';
     
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${keyValue}`, {
+      // 1. Fetch available models
+      const modelsResponse = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${keyValue}`);
+      const modelsData = await modelsResponse.json();
+      
+      let modelsSupported = [];
+      if (modelsResponse.ok && modelsData.models) {
+        modelsSupported = modelsData.models.map(m => m.name.replace('models/', ''));
+        if (modelsListDiv) {
+          modelsListDiv.innerHTML = `<strong>Available models:</strong><br>${modelsSupported.join(', ')}`;
+          modelsListDiv.style.display = 'block';
+        }
+      }
+      
+      // 2. Perform a test generateContent call using the best available model
+      const testModel = modelsSupported.includes('gemini-3.5-flash') ? 'gemini-3.5-flash' : 
+                          modelsSupported.includes('gemini-2.5-flash') ? 'gemini-2.5-flash' :
+                          modelsSupported.includes('gemini-1.5-flash') ? 'gemini-1.5-flash' : 
+                          (modelsSupported.find(m => m.includes('flash')) || 'gemini-3.5-flash');
+      
+      console.log(`Testing content generation with model: ${testModel}`);
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${testModel}:generateContent?key=${keyValue}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +232,7 @@ function initUI() {
       const data = await response.json();
       
       if (response.ok) {
-        resultSpan.textContent = 'Success! Key is active and responding.';
+        resultSpan.textContent = `Success! (${testModel} active)`;
         resultSpan.style.color = '#10b981'; // green
       } else {
         const errMsg = data.error?.message || response.statusText || 'Unknown Error';
@@ -389,6 +412,11 @@ function updateAPIStatusPill() {
 function openSettingsModal() {
   const testResult = document.getElementById('api-key-test-result');
   if (testResult) testResult.textContent = '';
+  const modelsListDiv = document.getElementById('api-key-models-list');
+  if (modelsListDiv) {
+    modelsListDiv.style.display = 'none';
+    modelsListDiv.innerHTML = '';
+  }
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 

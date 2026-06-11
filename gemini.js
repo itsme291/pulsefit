@@ -231,25 +231,42 @@ async function handleUserMessageSend() {
       }
     });
     
-    // Call Gemini API Stream Endpoint
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:streamGenerateContent?key=${settings.apiKey}`;
+    // Call Gemini API Stream Endpoint with fallback chain
+    let response = null;
+    let errorDetails = '';
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': settings.apiKey
-      },
-      body: JSON.stringify({
-        contents: contents,
-        generationConfig: {
-          temperature: 0.4
+    for (let model of modelsToTry) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${settings.apiKey}`;
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': settings.apiKey
+          },
+          body: JSON.stringify({
+            contents: contents,
+            generationConfig: {
+              temperature: 0.4
+            }
+          })
+        });
+        if (response.ok) {
+          console.log(`Successfully connected to Gemini model: ${model}`);
+          break;
         }
-      })
-    });
+        const errJson = await response.json().catch(() => ({}));
+        errorDetails = errJson.error?.message || response.statusText || 'Unknown Error';
+        console.warn(`Failed to connect to ${model} (HTTP ${response.status}): ${errorDetails}. Trying next...`);
+      } catch (err) {
+        errorDetails = err.message;
+        console.warn(`Failed to connect to ${model} due to network error: ${errorDetails}. Trying next...`);
+      }
+    }
     
-    if (!response.ok) {
-      throw new Error(`API returned HTTP ${response.status}`);
+    if (!response || !response.ok) {
+      throw new Error(`API returned HTTP ${response ? response.status : 'Unknown'} (${errorDetails})`);
     }
     
     // Process the stream chunk by chunk
@@ -530,28 +547,46 @@ JSON Structure:
     parts: parts
   });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${settings.apiKey}`;
+  // Call Gemini API generateContent Endpoint with fallback chain
+  let response = null;
+  let errorDetails = '';
+  const modelsToTry = ['gemini-3.5-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
   
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': settings.apiKey
-    },
-    body: JSON.stringify({
-      contents: contents,
-      systemInstruction: {
-        parts: [{ text: systemInstruction }]
-      },
-      generationConfig: {
-        temperature: 0.1,
-        responseMimeType: "application/json"
+  for (let model of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${settings.apiKey}`;
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': settings.apiKey
+        },
+        body: JSON.stringify({
+          contents: contents,
+          systemInstruction: {
+            parts: [{ text: systemInstruction }]
+          },
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json"
+          }
+        })
+      });
+      if (response.ok) {
+        console.log(`Successfully matched foods with Gemini model: ${model}`);
+        break;
       }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Gemini API returned HTTP ${response.status}`);
+      const errJson = await response.json().catch(() => ({}));
+      errorDetails = errJson.error?.message || response.statusText || 'Unknown Error';
+      console.warn(`Failed to connect to ${model} for food parsing (HTTP ${response.status}): ${errorDetails}. Trying next...`);
+    } catch (err) {
+      errorDetails = err.message;
+      console.warn(`Failed to connect to ${model} for food parsing due to network error: ${errorDetails}. Trying next...`);
+    }
+  }
+  
+  if (!response || !response.ok) {
+    throw new Error(`Gemini API returned HTTP ${response ? response.status : 'Unknown'} (${errorDetails})`);
   }
 
   const result = await response.json();
