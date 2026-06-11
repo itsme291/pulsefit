@@ -64,7 +64,69 @@ function restoreSessionToken() {
     // Token expired or not found
     localStorage.removeItem('pulsefit_gdrive_token');
     localStorage.removeItem('pulsefit_gdrive_token_expires');
+    
+    if (localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+      console.log('GDrive token expired. Attempting background token renewal...');
+      autoRenewToken();
+    } else {
+      updateGDriveStatus('disconnected');
+    }
+  }
+}
+
+// --- Auto-Renew Google Drive Token Silently ---
+function autoRenewToken() {
+  if (!settings.googleClientId || settings.googleClientId.trim() === '') {
     updateGDriveStatus('disconnected');
+    return;
+  }
+  
+  updateGDriveStatus('connecting');
+  
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: settings.googleClientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error !== undefined) {
+          updateGDriveStatus('disconnected');
+          console.error('Auto-renew Callback Error:', tokenResponse);
+          return;
+        }
+        
+        gdriveAccessToken = tokenResponse.access_token;
+        gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
+        
+        localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
+        localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        localStorage.setItem('pulsefit_gdrive_connected', 'true');
+        
+        if (typeof gapi !== 'undefined' && gapi.client) {
+          gapi.client.setToken({ access_token: gdriveAccessToken });
+        }
+        
+        updateGDriveStatus('connected');
+        console.log('Google Drive auto-renewed token successfully!');
+        
+        pullAndMergeDataFromDrive().then(success => {
+          if (success) {
+            if (typeof renderNutritionTab === 'function') renderNutritionTab();
+            if (typeof renderHistory === 'function') renderHistory();
+            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+          }
+        });
+      },
+      error_callback: (err) => {
+        updateGDriveStatus('disconnected');
+        console.error('Auto-renew OAuth Error:', err);
+      }
+    });
+    
+    // Request token silently without forcing consent prompt (silent renewal if already approved)
+    tokenClient.requestAccessToken({ prompt: '' });
+  } catch (err) {
+    updateGDriveStatus('disconnected');
+    console.error('Auto-renew failed to initiate:', err);
   }
 }
 
