@@ -232,7 +232,7 @@ async function handleUserMessageSend() {
     });
     
     // Call Gemini API Stream Endpoint
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${settings.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:streamGenerateContent?key=${settings.apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -529,7 +529,7 @@ JSON Structure:
     parts: parts
   });
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${settings.apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${settings.apiKey}`;
   
   const response = await fetch(url, {
     method: 'POST',
