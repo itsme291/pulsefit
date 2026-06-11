@@ -237,7 +237,8 @@ async function handleUserMessageSend() {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'x-goog-api-key': settings.apiKey
       },
       body: JSON.stringify({
         contents: contents,
@@ -534,7 +535,8 @@ JSON Structure:
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'x-goog-api-key': settings.apiKey
     },
     body: JSON.stringify({
       contents: contents,

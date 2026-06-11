@@ -181,6 +181,39 @@ function initUI() {
   document.getElementById('open-settings-btn').addEventListener('click', openSettingsModal);
   document.getElementById('close-settings-modal').addEventListener('click', closeSettingsModal);
   document.getElementById('save-api-key-btn').addEventListener('click', saveAPIKey);
+  document.getElementById('test-api-key-btn').addEventListener('click', async () => {
+    const keyInput = document.getElementById('settings-api-key');
+    const keyValue = keyInput.value.trim();
+    const resultSpan = document.getElementById('api-key-test-result');
+    
+    if (keyValue === '') {
+      resultSpan.textContent = 'Please enter a key first.';
+      resultSpan.style.color = 'var(--danger)';
+      return;
+    }
+    
+    resultSpan.textContent = 'Testing connection...';
+    resultSpan.style.color = 'var(--text-muted)';
+    
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${keyValue}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        resultSpan.textContent = 'Success! Key is active.';
+        resultSpan.style.color = '#10b981'; // green
+      } else {
+        const errMsg = data.error?.message || response.statusText || 'Unknown Error';
+        resultSpan.textContent = `Error (${response.status}): ${errMsg}`;
+        resultSpan.style.color = 'var(--danger)';
+        console.error('Gemini Key Test Failure:', data);
+      }
+    } catch (err) {
+      resultSpan.textContent = `Network Error: ${err.message}`;
+      resultSpan.style.color = 'var(--danger)';
+      console.error('Gemini Key Test Connection Network Exception:', err);
+    }
+  });
   document.getElementById('api-status-pill').addEventListener('click', () => {
     if (settings.apiKey === '') openSettingsModal();
   });
@@ -345,6 +378,8 @@ function updateAPIStatusPill() {
 // ==========================================================================
 
 function openSettingsModal() {
+  const testResult = document.getElementById('api-key-test-result');
+  if (testResult) testResult.textContent = '';
   document.getElementById('settings-modal').classList.remove('hidden');
 }
 
