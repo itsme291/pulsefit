@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=10">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=9" defer></script>
-  <script src="gemini.js?v=9" defer></script>
-  <script src="app.js?v=9" defer></script>
+  <script src="gdrive.js?v=10" defer></script>
+  <script src="gemini.js?v=10" defer></script>
+  <script src="app.js?v=10" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -290,9 +290,19 @@
                 
                 <!-- Photo uploader -->
                 <div class="photo-upload-zone" id="photo-upload-zone" style="border: 1px dashed var(--border-color); border-radius: var(--radius-md); padding: 20px; text-align: center; cursor: pointer; transition: var(--transition-fast); background: rgba(255,255,255,0.01); position: relative; height: 110px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
-                  <i data-lucide="camera" id="upload-icon-element" style="width: 24px; height: 24px; color: var(--text-secondary);"></i>
-                  <span id="upload-text-element" style="font-size: 13px; color: var(--text-secondary);">Click to upload food photo</span>
+                  <div class="photo-upload-options" id="upload-options">
+                    <button type="button" class="upload-option-btn" id="btn-camera-capture">
+                      <i data-lucide="camera"></i>
+                      <span>Take Photo</span>
+                    </button>
+                    <div style="width: 1px; height: 40px; background: var(--border-color);"></div>
+                    <button type="button" class="upload-option-btn" id="btn-file-select">
+                      <i data-lucide="image"></i>
+                      <span>Choose Image</span>
+                    </button>
+                  </div>
                   <input type="file" id="food-image-input" accept="image/*" style="display: none;">
+                  <input type="file" id="food-camera-fallback-input" accept="image/*" capture="environment" style="display: none;">
                   <div class="image-preview-container hidden" id="image-preview-container" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: var(--radius-md); overflow: hidden; background: #000;">
                     <img id="image-preview" src="" alt="Food preview" style="width: 100%; height: 100%; object-fit: cover;">
                     <button type="button" class="btn-remove-preview" id="btn-remove-preview" style="position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition-fast);" title="Remove Photo"><i data-lucide="x" style="width: 14px; height: 14px;"></i></button>
@@ -664,6 +674,41 @@
         </div>
         <div class="modal-body">
           <pre id="log-viewer-content" style="background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; color: var(--text-primary);"></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Camera Capture Modal -->
+    <div class="modal-backdrop hidden" id="camera-modal">
+      <div class="modal-card" style="max-width: 480px;">
+        <div class="modal-header">
+          <h3 style="display: flex; align-items: center; gap: 8px; margin: 0;">
+            <i data-lucide="camera" style="color: var(--primary); width: 20px; height: 20px;"></i>
+            Camera Capture
+          </h3>
+          <button class="modal-close" id="close-camera-modal"><i data-lucide="x"></i></button>
+        </div>
+        <div class="modal-body" style="gap: 15px; padding: 20px;">
+          <div class="camera-viewfinder-container">
+            <video id="camera-video" autoplay playsinline></video>
+            <div id="camera-loading" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(7, 9, 19, 0.95); gap: 12px; z-index: 5;">
+              <div class="loading-spinner" style="width: 28px; height: 28px; border: 2px solid rgba(99, 102, 241, 0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <span style="font-size: 13px; color: var(--text-secondary);">Accessing camera stream...</span>
+            </div>
+            <div id="camera-error" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(7, 9, 19, 0.95); color: var(--danger); padding: 20px; text-align: center; gap: 12px; z-index: 6;">
+              <i data-lucide="alert-triangle" style="width: 30px; height: 30px;"></i>
+              <span id="camera-error-message" style="font-size: 13px; font-weight: 500;">Failed to access camera.</span>
+            </div>
+          </div>
+          <div class="camera-actions" style="display: flex; justify-content: center; align-items: center; gap: 24px; padding-bottom: 5px;">
+            <button class="btn btn-outline-secondary btn-circle" id="btn-camera-switch" title="Switch Camera">
+              <i data-lucide="rotate-cw" style="width: 18px; height: 18px;"></i>
+            </button>
+            <button class="btn btn-primary" id="btn-camera-shutter" style="width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; padding: 0; background: var(--primary); border: 4px solid rgba(255,255,255,0.2); box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);" title="Capture Photo">
+              <div style="width: 22px; height: 22px; border-radius: 50%; background: #fff;"></div>
+            </button>
+            <div style="width: 46px;"></div> <!-- spacer -->
+          </div>
         </div>
       </div>
     </div>

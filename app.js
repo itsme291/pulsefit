@@ -1710,18 +1710,48 @@ function initNutrition() {
   
   const uploadZone = document.getElementById('photo-upload-zone');
   const imageInput = document.getElementById('food-image-input');
+  const fallbackCameraInput = document.getElementById('food-camera-fallback-input');
   const removePreviewBtn = document.getElementById('btn-remove-preview');
   
   if (uploadZone && imageInput) {
     uploadZone.addEventListener('click', (e) => {
       if (e.target.closest('#btn-remove-preview')) return;
-      imageInput.click();
+      if (foodImageBase64) return; // Prevent clicks if a photo is already previewed
+      
+      const isCameraBtn = e.target.closest('#btn-camera-capture');
+      const isFileBtn = e.target.closest('#btn-file-select');
+      
+      if (isCameraBtn) {
+        openCameraCapture();
+      } else if (isFileBtn || !e.target.closest('.upload-option-btn')) {
+        imageInput.click();
+      }
     });
     imageInput.addEventListener('change', handleFoodImageSelect);
   }
   
+  if (fallbackCameraInput) {
+    fallbackCameraInput.addEventListener('change', handleFoodImageSelect);
+  }
+  
   if (removePreviewBtn) {
     removePreviewBtn.addEventListener('click', clearFoodImagePreview);
+  }
+  
+  // Set up camera modal listeners
+  const closeCameraBtn = document.getElementById('close-camera-modal');
+  if (closeCameraBtn) {
+    closeCameraBtn.addEventListener('click', closeCameraModal);
+  }
+  
+  const cameraSwitchBtn = document.getElementById('btn-camera-switch');
+  if (cameraSwitchBtn) {
+    cameraSwitchBtn.addEventListener('click', switchCamera);
+  }
+  
+  const cameraShutterBtn = document.getElementById('btn-camera-shutter');
+  if (cameraShutterBtn) {
+    cameraShutterBtn.addEventListener('click', capturePhoto);
   }
   
   fetchGoogleSheetFoods();
@@ -1930,11 +1960,188 @@ function clearFoodImagePreview() {
   const fileInput = document.getElementById('food-image-input');
   if (fileInput) fileInput.value = '';
   
+  const fallbackInput = document.getElementById('food-camera-fallback-input');
+  if (fallbackInput) fallbackInput.value = '';
+  
   const previewContainer = document.getElementById('image-preview-container');
   if (previewContainer) {
     previewContainer.classList.add('hidden');
   }
 }
+
+// --- Webcam / Camera Capture Management ---
+let cameraStream = null;
+let cameraFacingMode = 'environment'; // Rear-facing camera by default for food photos
+
+function openCameraCapture() {
+  const cameraModal = document.getElementById('camera-modal');
+  const cameraVideo = document.getElementById('camera-video');
+  const cameraLoading = document.getElementById('camera-loading');
+  const cameraError = document.getElementById('camera-error');
+  
+  if (!cameraModal) return;
+  
+  // Show modal
+  cameraModal.classList.remove('hidden');
+  if (cameraLoading) cameraLoading.classList.remove('hidden');
+  if (cameraError) cameraError.classList.add('hidden');
+  
+  // Refresh icons in modal if Lucide is available
+  if (window.lucide) {
+    window.lucide.createIcons();
+  }
+  
+  // Check browser/protocol support for getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    console.warn("getUserMedia not supported on this browser/context. Triggering native camera fallback.");
+    closeCameraModal();
+    triggerNativeCameraFallback();
+    return;
+  }
+  
+  startCameraStream();
+}
+
+function closeCameraModal() {
+  const cameraModal = document.getElementById('camera-modal');
+  if (cameraModal) {
+    cameraModal.classList.add('hidden');
+  }
+  stopCameraStream();
+}
+
+function stopCameraStream() {
+  if (cameraStream) {
+    try {
+      cameraStream.getTracks().forEach(track => track.stop());
+    } catch (err) {
+      console.error("Error stopping camera tracks:", err);
+    }
+    cameraStream = null;
+  }
+  const cameraVideo = document.getElementById('camera-video');
+  if (cameraVideo) {
+    cameraVideo.srcObject = null;
+  }
+}
+
+async function startCameraStream() {
+  const cameraVideo = document.getElementById('camera-video');
+  const cameraLoading = document.getElementById('camera-loading');
+  const cameraError = document.getElementById('camera-error');
+  const cameraErrorMessage = document.getElementById('camera-error-message');
+  
+  stopCameraStream();
+  
+  if (cameraLoading) cameraLoading.classList.remove('hidden');
+  if (cameraError) cameraError.classList.add('hidden');
+  
+  const constraints = {
+    video: {
+      facingMode: cameraFacingMode,
+      width: { ideal: 1024 },
+      height: { ideal: 768 }
+    },
+    audio: false
+  };
+  
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    cameraStream = stream;
+    if (cameraVideo) {
+      cameraVideo.srcObject = stream;
+    }
+    if (cameraLoading) cameraLoading.classList.add('hidden');
+  } catch (err) {
+    console.error("Error starting camera stream:", err);
+    if (cameraLoading) cameraLoading.classList.add('hidden');
+    
+    let errMsg = "Could not access the camera. Make sure camera permissions are enabled.";
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      errMsg = "Camera access denied. Please grant permission or choose an image from your gallery.";
+    }
+    
+    if (cameraError && cameraErrorMessage) {
+      cameraErrorMessage.textContent = errMsg;
+      cameraError.classList.remove('hidden');
+    }
+    
+    // Auto-trigger native camera capture if it's a device failure rather than direct user denial
+    if (err.name !== 'NotAllowedError' && err.name !== 'PermissionDeniedError') {
+      setTimeout(() => {
+        closeCameraModal();
+        triggerNativeCameraFallback();
+      }, 1500);
+    }
+  }
+}
+
+function triggerNativeCameraFallback() {
+  const fallbackInput = document.getElementById('food-camera-fallback-input');
+  if (fallbackInput) {
+    fallbackInput.click();
+  }
+}
+
+function switchCamera() {
+  cameraFacingMode = (cameraFacingMode === 'environment') ? 'user' : 'environment';
+  startCameraStream();
+}
+
+function capturePhoto() {
+  const cameraVideo = document.getElementById('camera-video');
+  if (!cameraVideo || !cameraStream) return;
+  
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = cameraVideo.videoWidth || 640;
+    canvas.height = cameraVideo.videoHeight || 480;
+    
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+    
+    // Apply client-side resizing and JPEG compression directly to the frame
+    const maxDimension = 1024;
+    const quality = 0.7;
+    let width = canvas.width;
+    let height = canvas.height;
+    
+    if (width > maxDimension || height > maxDimension) {
+      if (width > height) {
+        height = Math.round((height * maxDimension) / width);
+        width = maxDimension;
+      } else {
+        width = Math.round((width * maxDimension) / height);
+        height = maxDimension;
+      }
+    }
+    
+    const compressCanvas = document.createElement('canvas');
+    compressCanvas.width = width;
+    compressCanvas.height = height;
+    const compressCtx = compressCanvas.getContext('2d');
+    compressCtx.drawImage(canvas, 0, 0, width, height);
+    
+    const compressedDataUrl = compressCanvas.toDataURL('image/jpeg', quality);
+    const commaIdx = compressedDataUrl.indexOf(',');
+    foodImageBase64 = compressedDataUrl.substring(commaIdx + 1);
+    foodImageMimeType = 'image/jpeg';
+    
+    const previewContainer = document.getElementById('image-preview-container');
+    const previewImg = document.getElementById('image-preview');
+    if (previewContainer && previewImg) {
+      previewImg.src = compressedDataUrl;
+      previewContainer.classList.remove('hidden');
+    }
+    
+    closeCameraModal();
+  } catch (err) {
+    console.error("Error capturing photo from stream:", err);
+    alert("Failed to capture photo. Please try choosing an image from your library.");
+    closeCameraModal();
+  }
+}
+
 
 async function handleLogFood() {
   const textInput = document.getElementById('food-input-text').value.trim();
