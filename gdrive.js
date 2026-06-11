@@ -646,23 +646,20 @@ async function backupDataToDrive() {
       fileId = files[0].id;
       console.log(`Updating existing backup file in Google Drive (ID: ${fileId})...`);
       
-      // PATCH file content via media upload
-      const response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+      const response = await gapi.client.request({
+        path: `/upload/drive/v3/files/${fileId}`,
         method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${gdriveAccessToken}`,
-          'Content-Type': 'application/json'
-        },
+        params: { uploadType: 'media' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(backupData)
       });
       
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error(`Failed to update backup file content. Status: ${response.status}`);
       }
     } else {
       console.log('Creating new backup file in Google Drive...');
       
-      // Multipart POST request to create file with metadata and media content
       const metadata = {
         name: 'pulsefit_backup.json',
         mimeType: 'application/json',
@@ -670,28 +667,24 @@ async function backupDataToDrive() {
       };
       
       const boundary = 'pulsefit_backup_boundary';
-      const delimiter = `\r\n--${boundary}\r\n`;
-      const close_delim = `\r\n--${boundary}--`;
-      
       const multipartBody = 
-        delimiter +
+        `--${boundary}\r\n` +
         'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
         JSON.stringify(metadata) +
-        delimiter +
+        `\r\n--${boundary}\r\n` +
         'Content-Type: application/json\r\n\r\n' +
         JSON.stringify(backupData) +
-        close_delim;
+        `\r\n--${boundary}--`;
         
-      const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      const response = await gapi.client.request({
+        path: '/upload/drive/v3/files',
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${gdriveAccessToken}`,
-          'Content-Type': `multipart/related; boundary=${boundary}`
-        },
+        params: { uploadType: 'multipart' },
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
         body: multipartBody
       });
       
-      if (!response.ok) {
+      if (response.status !== 200) {
         throw new Error(`Failed to create backup file. Status: ${response.status}`);
       }
     }
@@ -725,7 +718,6 @@ async function pullAndMergeDataFromDrive() {
     const files = searchResponse.result.files;
     if (!files || files.length === 0) {
       console.log("No backup file found in Google Drive yet. Uploading local state as first backup...");
-      // Save current local data to Drive
       await backupDataToDrive();
       return true;
     }
@@ -733,21 +725,18 @@ async function pullAndMergeDataFromDrive() {
     const fileId = files[0].id;
     console.log(`Downloading backup file content from Google Drive (ID: ${fileId})...`);
     
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${gdriveAccessToken}`
-      }
+    const response = await gapi.client.drive.files.get({
+      fileId: fileId,
+      alt: 'media'
     });
     
-    if (!response.ok) {
-      throw new Error(`Failed to download backup file content. Status: ${response.status}`);
+    let backupData = response.result;
+    if (typeof backupData === 'string') {
+      backupData = JSON.parse(backupData);
     }
     
-    const backupData = await response.json();
     console.log("Downloaded backup content successfully. Merging...", backupData);
     
-    // Call merge function in app.js
     let merged = false;
     if (typeof mergePulseFitData === 'function') {
       merged = mergePulseFitData(backupData);
