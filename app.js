@@ -1797,26 +1797,64 @@ function parseCSVLine(text) {
   return result;
 }
 
-function handleFoodImageSelect(e) {
+function resizeAndCompressImage(file, maxDimension = 1024, quality = 0.7) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(compressedDataUrl);
+      };
+      img.onerror = (err) => reject(err);
+      img.src = event.target.result;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleFoodImageSelect(e) {
   const file = e.target.files[0];
   if (!file) return;
   
-  foodImageMimeType = file.type;
+  foodImageMimeType = 'image/jpeg';
   
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    const rawBase64 = event.target.result;
-    const commaIdx = rawBase64.indexOf(',');
-    foodImageBase64 = rawBase64.substring(commaIdx + 1);
+  try {
+    const compressedDataUrl = await resizeAndCompressImage(file);
+    const commaIdx = compressedDataUrl.indexOf(',');
+    foodImageBase64 = compressedDataUrl.substring(commaIdx + 1);
     
     const previewContainer = document.getElementById('image-preview-container');
     const previewImg = document.getElementById('image-preview');
     if (previewContainer && previewImg) {
-      previewImg.src = rawBase64;
+      previewImg.src = compressedDataUrl;
       previewContainer.classList.remove('hidden');
     }
-  };
-  reader.readAsDataURL(file);
+  } catch (err) {
+    console.error("Failed to compress image:", err);
+    alert("Failed to process image. Please try another photo.");
+  }
 }
 
 function clearFoodImagePreview() {
