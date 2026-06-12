@@ -331,6 +331,60 @@ async function appendDocContent(fileId, text) {
   }
 }
 
+// --- Prepend text to a Google Doc just after the header or at the top ---
+async function prependWorkoutLog(fileId, text) {
+  try {
+    const docResponse = await gapi.client.docs.documents.get({
+      documentId: fileId
+    });
+    
+    const bodyContent = docResponse.result.body.content;
+    let insertIndex = 1;
+    let foundEntry = false;
+    
+    for (const element of bodyContent) {
+      if (element.paragraph) {
+        const pText = element.paragraph.elements
+          .map(el => el.textRun ? el.textRun.content : '')
+          .join('');
+        
+        if (pText.includes('==================================================') || pText.includes('Workout Date:')) {
+          insertIndex = element.startIndex;
+          foundEntry = true;
+          break;
+        }
+      }
+    }
+    
+    if (!foundEntry) {
+      // Fallback: insert at the end of the document (after the header)
+      const lastElement = bodyContent[bodyContent.length - 1];
+      insertIndex = Math.max(1, lastElement.endIndex - 1);
+    }
+    
+    // Perform the batchUpdate to insert text at the calculated insertIndex
+    await gapi.client.docs.documents.batchUpdate({
+      documentId: fileId,
+      resource: {
+        requests: [
+          {
+            insertText: {
+              location: {
+                index: insertIndex
+              },
+              text: text + "\n"
+            }
+          }
+        ]
+      }
+    });
+    console.log('Prepended to Google Doc successfully!');
+  } catch (err) {
+    console.error('Error prepending to Google Doc:', err);
+    throw err;
+  }
+}
+
 // --- Sync Workout Log with Google Doc PulseFit_Workout_Log ---
 async function syncWorkoutToDrive(workout) {
   if (!isGDriveConnected()) {
@@ -360,10 +414,10 @@ async function syncWorkoutToDrive(workout) {
     let fileId = null;
     
     if (files && files.length > 0) {
-      // Google Doc exists - append text
+      // Google Doc exists - prepend text
       fileId = files[0].id;
-      console.log('Appending log entry to existing Google Doc in GDrive...');
-      await appendDocContent(fileId, "\n\n" + newLogEntry);
+      console.log('Prepending log entry to existing Google Doc in GDrive...');
+      await prependWorkoutLog(fileId, newLogEntry);
     } else {
       // Doc does not exist - create it
       const createResponse = await gapi.client.drive.files.create({
