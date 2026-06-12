@@ -34,6 +34,29 @@ function initGoogleClient() {
 document.addEventListener('DOMContentLoaded', () => {
   // Let libraries load asynchronously first, then initialize
   setTimeout(initGoogleClient, 500);
+  
+  // Attach event listener to header Google Drive status pill for easy one-click reconnect / sync
+  const headerPill = document.getElementById('header-gdrive-status-pill');
+  if (headerPill) {
+    headerPill.addEventListener('click', () => {
+      if (gdriveAccessToken && gdriveTokenExpiry && gdriveTokenExpiry > Date.now()) {
+        console.log('Header GDrive status pill clicked: initiating manual sync...');
+        pullAndMergeDataFromDrive().then(success => {
+          if (success) {
+            if (typeof renderNutritionTab === 'function') renderNutritionTab();
+            if (typeof renderHistory === 'function') renderHistory();
+            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+            alert('Google Drive data synced successfully!');
+          } else {
+            alert('Sync completed. Local data is already up-to-date.');
+          }
+        });
+      } else {
+        console.log('Header GDrive status pill clicked: initiating re-connection popup...');
+        connectGoogleDrive();
+      }
+    });
+  }
 });
 
 // --- Restore Connection Token from Storage ---
@@ -202,34 +225,67 @@ function updateGDriveStatus(status) {
   const viewLogBtn = document.getElementById('view-gdrive-log-btn');
   const syncDataBtn = document.getElementById('sync-gdrive-data-btn');
   
-  if (!badge || !connectBtn) return;
+  // Header pill elements
+  const headerPill = document.getElementById('header-gdrive-status-pill');
+  const headerText = document.getElementById('header-gdrive-status-text');
   
-  badge.className = `gdrive-status-badge ${status}`;
-  
-  if (viewLogBtn) {
-    viewLogBtn.disabled = (status !== 'connected');
+  if (badge && connectBtn) {
+    badge.className = `gdrive-status-badge ${status}`;
+    
+    if (viewLogBtn) {
+      viewLogBtn.disabled = (status !== 'connected');
+    }
+    
+    if (syncDataBtn) {
+      syncDataBtn.disabled = (status !== 'connected');
+    }
+    
+    if (status === 'connected') {
+      badge.textContent = 'Connected';
+      connectBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Reconnect';
+      connectBtn.className = 'btn btn-outline-primary btn-sm';
+      connectBtn.disabled = false;
+    } else if (status === 'connecting') {
+      badge.textContent = 'Connecting...';
+      connectBtn.disabled = true;
+    } else {
+      badge.textContent = 'Disconnected';
+      connectBtn.innerHTML = '<i data-lucide="log-in"></i> Connect Google Drive';
+      connectBtn.className = 'btn btn-outline-secondary btn-sm';
+      connectBtn.disabled = (!settings.googleClientId || settings.googleClientId.trim() === '');
+    }
   }
   
-  if (syncDataBtn) {
-    syncDataBtn.disabled = (status !== 'connected');
+  // Update header status pill
+  if (headerPill && headerText) {
+    if (status === 'connected') {
+      headerPill.className = 'api-status-pill success';
+      headerText.textContent = 'Drive: Connected';
+      const icon = headerPill.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', 'cloud');
+      }
+    } else if (status === 'connecting') {
+      headerPill.className = 'api-status-pill success';
+      headerText.textContent = 'Drive: Connecting...';
+      const icon = headerPill.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', 'refresh-cw');
+      }
+    } else {
+      const previouslyConnected = localStorage.getItem('pulsefit_gdrive_connected') === 'true';
+      headerPill.className = 'api-status-pill error';
+      headerText.textContent = previouslyConnected ? 'Drive: Reconnect' : 'Drive: Disconnected';
+      const icon = headerPill.querySelector('i');
+      if (icon) {
+        icon.setAttribute('data-lucide', 'cloud-off');
+      }
+    }
   }
   
-  if (status === 'connected') {
-    badge.textContent = 'Connected';
-    connectBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Reconnect';
-    connectBtn.className = 'btn btn-outline-primary btn-sm';
-    connectBtn.disabled = false;
-  } else if (status === 'connecting') {
-    badge.textContent = 'Connecting...';
-    connectBtn.disabled = true;
-  } else {
-    badge.textContent = 'Disconnected';
-    connectBtn.innerHTML = '<i data-lucide="log-in"></i> Connect Google Drive';
-    connectBtn.className = 'btn btn-outline-secondary btn-sm';
-    connectBtn.disabled = (!settings.googleClientId || settings.googleClientId.trim() === '');
+  if (typeof lucide !== 'undefined' && lucide.createIcons) {
+    lucide.createIcons();
   }
-  
-  lucide.createIcons();
 }
 
 // --- Check if Token is Valid ---
