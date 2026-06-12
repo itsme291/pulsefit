@@ -527,6 +527,9 @@ ${sheetContext}
    - For items where the sheet has a specific weight unit (e.g. Almonds (weight) is per gram), match carefully.
 
 3. If the food is NOT in the spreadsheet database, estimate its macros using your general nutrition knowledge (the internet). Mark the source as "Internet".
+   - Use standard macro densities: 1g of Carbohydrates = 4 kcal, 1g of Protein = 4 kcal, 1g of Fat = 9 kcal.
+   - Ensure the total calories matches the formula: Calories = (Carbs * 4) + (Protein * 4) + (Fat * 9).
+   - Double check your math! For example, 3 grams of oil contains exactly 3g of fat, 0g protein, 0g carbs, and 3 * 9 = 27 calories. NEVER confuse the 9 kcal/g fat density with the physical weight in grams. 3g of oil is NOT 27g of fat. The combined weight of carbs + protein + fat in grams cannot exceed the physical weight of the food item.
 4. Calculate final macros: carbs (g), protein (g), fat (g), calories (kcal).
 5. Your output must be a valid JSON array of objects representing the food items. Do not include markdown formatting or "json" wrap blocks. Return ONLY the raw JSON.
 
@@ -619,9 +622,76 @@ JSON Structure:
   const rawText = result.candidates[0].content.parts[0].text;
   
   try {
-    return JSON.parse(rawText);
+    const parsed = JSON.parse(rawText);
+    return sanitizeParsedFoodItems(parsed);
   } catch (e) {
     console.error("Failed to parse JSON response from Gemini:", rawText);
     throw new Error("Failed to parse nutrition details. Please try again with clearer text or photo.");
   }
+}
+
+// --- Sanitize and Validate Parsed Food Items to Prevent Arithmetic Errors ---
+function sanitizeParsedFoodItems(items) {
+  if (!Array.isArray(items)) return items;
+  
+  return items.map(item => {
+    // Ensure numeric values
+    item.carbs = parseFloat(item.carbs) || 0;
+    item.protein = parseFloat(item.protein) || 0;
+    item.fat = parseFloat(item.fat) || 0;
+    item.calories = parseFloat(item.calories) || 0;
+    
+    // Attempt to parse physical weight in grams
+    if (item.quantity) {
+      const match = item.quantity.match(/(\d+(?:\.\d+)?)\s*(?:g|gram|gms|grams)\b/i);
+      if (match) {
+        const totalWeight = parseFloat(match[1]);
+        if (totalWeight > 0) {
+          // Check for classic LLM arithmetic errors where macro weight is confused with calorie multiplier
+          // e.g. 3g oil yielding 27g fat (3 * 9)
+          if (item.fat > totalWeight && Math.abs(item.fat - totalWeight * 9) < totalWeight * 2) {
+            console.warn(`Corrected LLM macro density error for fat: ${item.fat}g reduced to ${totalWeight}g for ${item.name}`);
+            item.fat = totalWeight;
+            item.calories = (item.carbs * 4) + (item.protein * 4) + (item.fat * 9);
+          }
+          if (item.carbs > totalWeight && Math.abs(item.carbs - totalWeight * 4) < totalWeight * 1) {
+            console.warn(`Corrected LLM macro density error for carbs: ${item.carbs}g reduced to ${totalWeight}g for ${item.name}`);
+            item.carbs = totalWeight;
+            item.calories = (item.carbs * 4) + (item.protein * 4) + (item.fat * 9);
+          }
+          if (item.protein > totalWeight && Math.abs(item.protein - totalWeight * 4) < totalWeight * 1) {
+            console.warn(`Corrected LLM macro density error for protein: ${item.protein}g reduced to ${totalWeight}g for ${item.name}`);
+            item.protein = totalWeight;
+            item.calories = (item.carbs * 4) + (item.protein * 4) + (item.fat * 9);
+          }
+          
+          // General safety clamp: sum of macronutrients cannot exceed physical weight
+          const sumMacros = item.carbs + item.protein + item.fat;
+          if (sumMacros > totalWeight * 1.1) { // 10% tolerance for moisture/mineral approximation
+            console.warn(`Clamping macros because combined weight (${sumMacros}g) exceeds physical weight (${totalWeight}g) for ${item.name}`);
+            const scale = totalWeight / sumMacros;
+            item.carbs = Number((item.carbs * scale).toFixed(1));
+            item.protein = Number((item.protein * scale).toFixed(1));
+            item.fat = Number((item.fat * scale).toFixed(1));
+            item.calories = Number(((item.carbs * 4) + (item.protein * 4) + (item.fat * 9)).toFixed(1));
+          }
+        }
+      }
+    }
+    
+    // General calorie sanity check: ensure calories are within 15% of macro-derived calories
+    const calculatedCalories = (item.carbs * 4) + (item.protein * 4) + (item.fat * 9);
+    if (item.calories <= 0 || Math.abs(item.calories - calculatedCalories) > calculatedCalories * 0.15) {
+      console.log(`Recalculated calories for ${item.name} from macros: ${item.calories} kcal -> ${calculatedCalories} kcal`);
+      item.calories = calculatedCalories;
+    }
+    
+    // Round to 1 decimal place
+    item.carbs = Number(item.carbs.toFixed(1));
+    item.protein = Number(item.protein.toFixed(1));
+    item.fat = Number(item.fat.toFixed(1));
+    item.calories = Number(item.calories.toFixed(1));
+    
+    return item;
+  });
 }
