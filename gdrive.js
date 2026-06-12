@@ -57,6 +57,29 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+  
+  // Attach event listener to homepage Google Drive status banner button
+  const homeActionBtn = document.getElementById('gdrive-home-action-btn');
+  if (homeActionBtn) {
+    homeActionBtn.addEventListener('click', () => {
+      if (gdriveAccessToken && gdriveTokenExpiry && gdriveTokenExpiry > Date.now()) {
+        console.log('Home GDrive action button clicked: initiating manual sync...');
+        pullAndMergeDataFromDrive().then(success => {
+          if (success) {
+            if (typeof renderNutritionTab === 'function') renderNutritionTab();
+            if (typeof renderHistory === 'function') renderHistory();
+            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+            alert('Google Drive data synced successfully!');
+          } else {
+            alert('Sync completed. Local data is already up-to-date.');
+          }
+        });
+      } else {
+        console.log('Home GDrive action button clicked: initiating connection popup...');
+        connectGoogleDrive();
+      }
+    });
+  }
 });
 
 // --- Restore Connection Token from Storage ---
@@ -229,6 +252,12 @@ function updateGDriveStatus(status) {
   const headerPill = document.getElementById('header-gdrive-status-pill');
   const headerText = document.getElementById('header-gdrive-status-text');
   
+  // Home banner elements
+  const homeIconBg = document.getElementById('gdrive-home-icon-bg');
+  const homeIcon = document.getElementById('gdrive-home-icon');
+  const homeStatusText = document.getElementById('gdrive-home-status-text');
+  const homeActionBtn = document.getElementById('gdrive-home-action-btn');
+  
   if (badge && connectBtn) {
     badge.className = `gdrive-status-badge ${status}`;
     
@@ -280,6 +309,43 @@ function updateGDriveStatus(status) {
       if (icon) {
         icon.setAttribute('data-lucide', 'cloud-off');
       }
+    }
+  }
+  
+  // Update homepage status banner
+  if (homeStatusText && homeActionBtn) {
+    if (status === 'connected') {
+      homeStatusText.textContent = 'Sync Status: Connected';
+      
+      if (homeIconBg) {
+        homeIconBg.style.background = 'rgba(16, 185, 129, 0.1)';
+        homeIconBg.style.color = 'var(--success)';
+      }
+      if (homeIcon) {
+        homeIcon.setAttribute('data-lucide', 'cloud');
+      }
+      
+      homeActionBtn.className = 'btn btn-outline-primary btn-sm';
+      homeActionBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sync Now';
+      homeActionBtn.disabled = false;
+    } else if (status === 'connecting') {
+      homeStatusText.textContent = 'Sync Status: Connecting...';
+      homeActionBtn.disabled = true;
+    } else {
+      const previouslyConnected = localStorage.getItem('pulsefit_gdrive_connected') === 'true';
+      homeStatusText.textContent = previouslyConnected ? 'Sync Status: Reconnect Required' : 'Sync Status: Disconnected';
+      
+      if (homeIconBg) {
+        homeIconBg.style.background = 'rgba(239, 68, 68, 0.1)';
+        homeIconBg.style.color = 'var(--danger)';
+      }
+      if (homeIcon) {
+        homeIcon.setAttribute('data-lucide', 'cloud-off');
+      }
+      
+      homeActionBtn.className = 'btn btn-primary btn-sm';
+      homeActionBtn.innerHTML = previouslyConnected ? '<i data-lucide="log-in"></i> Reconnect' : '<i data-lucide="log-in"></i> Connect Drive';
+      homeActionBtn.disabled = false;
     }
   }
   
