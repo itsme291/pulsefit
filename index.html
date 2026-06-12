@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=19">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=18" defer></script>
-  <script src="gemini.js?v=18" defer></script>
-  <script src="app.js?v=18" defer></script>
+  <script src="gdrive.js?v=19" defer></script>
+  <script src="gemini.js?v=19" defer></script>
+  <script src="app.js?v=19" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -80,7 +80,7 @@
       <!-- Topbar Header -->
       <header class="topbar">
         <div class="topbar-left">
-          <div style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Saurabh Goyal</div>
+          <div style="font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Saurabh's PulseFit</div>
           <h1 class="page-title" id="page-title">Log Workout</h1>
         </div>
         <div class="topbar-right" style="display: flex; gap: 10px;">
@@ -107,6 +107,12 @@
         
         <!-- =================== LOGGER TAB =================== -->
         <section class="tab-pane active" id="tab-logger">
+          
+          <!-- Welcome Greeting -->
+          <div class="welcome-header" style="margin-bottom: 20px;">
+            <h2 style="font-size: 26px; font-weight: 700; color: var(--text-primary); margin: 0;">Welcome, Saurabh!</h2>
+            <p style="margin: 4px 0 0 0; font-size: 13px; color: var(--text-secondary);">Your personal fitness and nutrition tracker.</p>
+          </div>
           
           <!-- Google Drive Status Banner -->
           <div class="gdrive-home-banner card" id="gdrive-home-banner" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: var(--radius-md); backdrop-filter: blur(10px);">
