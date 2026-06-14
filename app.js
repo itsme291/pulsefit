@@ -81,6 +81,9 @@ let settings = {
   userName: 'Saurabh'
 };
 
+// --- Access Control (Approval Gate) ---
+const ACCESS_SHEET_ID = '';
+
 // --- Timer & Visuals State ---
 let workoutTimerInterval = null;
 let restTimerInterval = null;
@@ -97,6 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initUI();
   initNutrition();
   lucide.createIcons();
+  initAccessCheck();
 });
 
 function loadData() {
@@ -314,6 +318,21 @@ function initUI() {
   document.getElementById('import-data-file').addEventListener('change', importData);
   document.getElementById('reset-app-btn').addEventListener('click', resetAppData);
   
+  // Access Control UI listeners
+  const createAccessBtn = document.getElementById('create-access-sheet-btn');
+  if (createAccessBtn) {
+    createAccessBtn.addEventListener('click', () => {
+      if (typeof createAccessControlSheet === 'function') {
+        createAccessControlSheet();
+      }
+    });
+  }
+  
+  const accessLoginBtn = document.getElementById('access-login-btn');
+  if (accessLoginBtn) {
+    accessLoginBtn.addEventListener('click', connectAccessGateGoogle);
+  }
+  
   // Save Username Listener
   document.getElementById('save-username-btn').addEventListener('click', () => {
     const nameInput = document.getElementById('settings-username');
@@ -431,6 +450,10 @@ function initUI() {
   document.getElementById('settings-api-key').value = settings.apiKey;
   document.getElementById('settings-google-client-id').value = settings.googleClientId || '';
   document.getElementById('settings-google-folder').value = settings.googleFolder || 'Pulsefit';
+  const accessSheetIdInput = document.getElementById('settings-access-sheet-id');
+  if (accessSheetIdInput) {
+    accessSheetIdInput.value = ACCESS_SHEET_ID || 'Disabled (Public Site)';
+  }
   if (settings.weightUnit === 'kg') {
     unitLbs.classList.remove('active');
     unitKg.classList.add('active');
@@ -2594,5 +2617,218 @@ function updateUserNameUI() {
   const welcomeTitle = document.querySelector('.welcome-header h2');
   if (welcomeTitle) {
     welcomeTitle.textContent = `Welcome, ${name}!`;
+  }
+}
+
+// --- Access Control (Approval Gate) ---
+function initAccessCheck() {
+  if (!ACCESS_SHEET_ID || ACCESS_SHEET_ID.trim() === '') {
+    console.log("Access Control: Disabled (Public Site).");
+    return;
+  }
+
+  console.log("Access Control: Active. Checking permissions...");
+  const overlay = document.getElementById('access-overlay');
+  if (!overlay) return;
+
+  // Show the overlay initially
+  overlay.classList.remove('hidden');
+
+  // Verify access using saved token
+  const token = localStorage.getItem('pulsefit_gdrive_token');
+  const expiry = localStorage.getItem('pulsefit_gdrive_token_expires');
+
+  if (token && expiry && parseInt(expiry) > Date.now()) {
+    verifyUserAccess(token);
+  } else {
+    // Show sign-in required state
+    showAccessGateState('login');
+  }
+}
+
+// Helper to switch overlay states
+function showAccessGateState(state, email = '', extra = '') {
+  const overlay = document.getElementById('access-overlay');
+  const title = document.getElementById('access-title');
+  const msg = document.getElementById('access-message');
+  const spinner = document.getElementById('access-spinner');
+  const loginBtn = document.getElementById('access-login-btn');
+  const requestBtn = document.getElementById('access-request-btn');
+  const statusIcon = document.getElementById('access-status-icon');
+
+  if (!overlay) return;
+
+  // Defaults
+  loginBtn.classList.add('hidden');
+  requestBtn.classList.add('hidden');
+  spinner.classList.add('hidden');
+  statusIcon.innerHTML = '';
+  statusIcon.style.color = 'var(--primary)';
+  statusIcon.style.background = 'rgba(99, 102, 241, 0.1)';
+
+  switch (state) {
+    case 'login':
+      title.textContent = "Access Restricted";
+      msg.textContent = "This application is private. Please sign in with your Google account to verify access.";
+      loginBtn.classList.remove('hidden');
+      statusIcon.innerHTML = '<i data-lucide="shield-alert" style="width: 32px; height: 32px;"></i>';
+      break;
+
+    case 'verifying':
+      title.textContent = "Verifying Access";
+      msg.textContent = "Checking your credentials against the approved user registry...";
+      spinner.classList.remove('hidden');
+      statusIcon.innerHTML = '<i data-lucide="shield" style="width: 32px; height: 32px;"></i>';
+      break;
+
+    case 'pending':
+      title.textContent = "Access Pending Approval";
+      msg.innerHTML = `Your account (<strong>${email}</strong>) is currently pending approval.<br><br>Please contact Saurabh to approve your access.`;
+      statusIcon.innerHTML = '<i data-lucide="clock" style="width: 32px; height: 32px;"></i>';
+      statusIcon.style.color = '#eab308';
+      statusIcon.style.background = 'rgba(234, 179, 8, 0.1)';
+      break;
+
+    case 'denied':
+      title.textContent = "Access Denied";
+      msg.innerHTML = `Your account (<strong>${email}</strong>) is not registered.<br><br>Click below to request access.`;
+      requestBtn.classList.remove('hidden');
+      requestBtn.href = `mailto:sgoyal@gmail.com?subject=Pulsefit Access Request&body=Hi Saurabh,%0D%0A%0D%0APlease approve my email: ${email} for Pulsefit.`;
+      statusIcon.innerHTML = '<i data-lucide="shield-x" style="width: 32px; height: 32px;"></i>';
+      statusIcon.style.color = 'var(--danger)';
+      statusIcon.style.background = 'rgba(239, 68, 68, 0.1)';
+      break;
+
+    case 'error':
+      title.textContent = "Verification Error";
+      msg.textContent = `An error occurred while validating access: ${extra}. Please try again.`;
+      loginBtn.classList.remove('hidden');
+      statusIcon.innerHTML = '<i data-lucide="alert-triangle" style="width: 32px; height: 32px;"></i>';
+      statusIcon.style.color = 'var(--danger)';
+      statusIcon.style.background = 'rgba(239, 68, 68, 0.1)';
+      break;
+  }
+
+  // Make sure Lucide re-renders icons in the statusIcon
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons({
+      attrs: { class: 'lucide' },
+      nameAttr: 'data-lucide'
+    });
+  }
+}
+
+async function verifyUserAccess(token) {
+  showAccessGateState('verifying');
+
+  try {
+    // 1. Get user email
+    const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!userInfoResponse.ok) {
+      throw new Error(`UserInfo API error: ${userInfoResponse.status}`);
+    }
+
+    const userInfo = await userInfoResponse.json();
+    const email = userInfo.email.trim().toLowerCase();
+
+    // 2. Fetch the access control sheet CSV
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${ACCESS_SHEET_ID}/export?format=csv`;
+    const csvResponse = await fetch(csvUrl);
+    if (!csvResponse.ok) {
+      throw new Error(`Spreadsheet fetch failed (Check sheet sharing permissions)`);
+    }
+
+    const csvText = await csvResponse.text();
+    const rows = csvText.split('\n');
+
+    let approved = false;
+    let found = false;
+
+    // Row loop (skipping header)
+    for (let i = 1; i < rows.length; i++) {
+      const line = rows[i].trim();
+      if (!line) continue;
+      
+      const cols = parseCSVLine(line);
+      if (cols.length > 0) {
+        const rowEmail = cols[0].trim().toLowerCase();
+        const rowStatus = cols[1] ? cols[1].trim().toLowerCase() : '';
+
+        if (rowEmail === email) {
+          found = true;
+          if (rowStatus === 'approved' || rowStatus === 'y' || rowStatus === 'yes') {
+            approved = true;
+          }
+          break;
+        }
+      }
+    }
+
+    if (approved) {
+      // Access allowed! Hide overlay
+      const overlay = document.getElementById('access-overlay');
+      if (overlay) overlay.classList.add('hidden');
+      console.log(`Access Granted for user: ${email}`);
+    } else if (found) {
+      // Found but status not approved (e.g. pending)
+      showAccessGateState('pending', email);
+    } else {
+      // Not found
+      showAccessGateState('denied', email);
+    }
+
+  } catch (err) {
+    console.error('Access verification error:', err);
+    showAccessGateState('error', '', err.message || err);
+  }
+}
+
+// --- Access Gate Sign In ---
+function connectAccessGateGoogle() {
+  if (!settings.googleClientId || settings.googleClientId.trim() === '') {
+    alert('Please ensure Google Client ID is configured.');
+    return;
+  }
+
+  showAccessGateState('verifying');
+
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: settings.googleClientId,
+      scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+      callback: (tokenResponse) => {
+        if (tokenResponse.error !== undefined) {
+          showAccessGateState('error', '', tokenResponse.error);
+          return;
+        }
+
+        gdriveAccessToken = tokenResponse.access_token;
+        gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
+
+        // Save to localStorage
+        localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
+        localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+        localStorage.setItem('pulsefit_gdrive_connected', 'true');
+
+        if (typeof gapi !== 'undefined' && gapi.client) {
+          gapi.client.setToken({ access_token: gdriveAccessToken });
+        }
+
+        // Check access
+        verifyUserAccess(gdriveAccessToken);
+      },
+      error_callback: (err) => {
+        console.error('Access Sign In Error:', err);
+        showAccessGateState('error', '', 'Google popup failed to open');
+      }
+    });
+
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  } catch (err) {
+    console.error('Access Sign In Error:', err);
+    showAccessGateState('error', '', err.message || err);
   }
 }

@@ -631,6 +631,24 @@
             </div>
           </div>
           
+          <!-- Access Control -->
+          <div class="settings-section">
+            <label class="settings-label">Access Control (Approval Gate)</label>
+            <div class="settings-row">
+              <span>Setup Access Sheet</span>
+              <button class="btn btn-secondary btn-sm" id="create-access-sheet-btn">
+                <i data-lucide="shield"></i> Create Access Sheet
+              </button>
+            </div>
+            <div class="settings-row">
+              <span>Spreadsheet ID</span>
+              <input type="text" id="settings-access-sheet-id" readonly placeholder="Disabled (Public Site)" style="width: 60%; height: 32px; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: var(--text-secondary); font-size: 11px; cursor: not-allowed;">
+            </div>
+            <div class="settings-help">
+              Restricts access to approved emails. Clicking "Create Access Sheet" will create a <code>Pulsefit_Access_Control</code> spreadsheet in your Google Drive and set it to public read-only.
+            </div>
+          </div>
+          
           <!-- Backup & Reset -->
           <div class="settings-section">
             <label class="settings-label">Data Management</label>
@@ -754,5 +772,33 @@
     </div>
 
   </div>
+
+  <!-- Access Control Overlay -->
+  <div id="access-overlay" class="hidden" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(7, 9, 19, 0.9); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 10000; display: flex; align-items: center; justify-content: center; color: var(--text-primary); font-family: var(--font-sans);">
+    <div class="glass-card" style="width: 90%; max-width: 420px; padding: 40px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 24px; border: 1px solid rgba(255,255,255,0.08); box-shadow: 0 20px 40px rgba(0,0,0,0.5);">
+      <div style="background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-size: 36px; font-weight: 800; tracking: -0.05em; margin-bottom: 5px;">Pulsefit</div>
+      <div id="access-status-icon" style="width: 64px; height: 64px; border-radius: 50%; background: rgba(99, 102, 241, 0.1); display: flex; align-items: center; justify-content: center; color: var(--primary);">
+        <i data-lucide="shield-alert" style="width: 32px; height: 32px;"></i>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <h3 id="access-title" style="font-size: 18px; font-weight: 600; margin: 0; color: var(--text-primary);">Access Restricted</h3>
+        <p id="access-message" style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; margin: 0;">This application is private. Please sign in with your Google account to verify access.</p>
+      </div>
+      <div id="access-spinner" class="hidden" style="margin: 10px 0;">
+        <div class="loading-spinner" style="width: 24px; height: 24px; border: 2px solid rgba(99, 102, 241, 0.1); border-top-color: var(--primary); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+      </div>
+      <div id="access-actions" style="display: flex; flex-direction: column; gap: 12px; width: 100%;">
+        <button class="btn btn-primary" id="access-login-btn" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; font-weight: 600; border-radius: var(--radius-md);">
+          <i data-lucide="log-in" style="width: 16px; height: 16px;"></i>
+          <span>Sign In with Google</span>
+        </button>
+        <a id="access-request-btn" class="btn btn-outline-secondary hidden" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; text-decoration: none; font-weight: 500; border-radius: var(--radius-md); font-size: 13px;">
+          <i data-lucide="mail" style="width: 16px; height: 16px;"></i>
+          <span>Request Access</span>
+        </a>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

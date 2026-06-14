@@ -20,6 +20,7 @@ function initGoogleClient() {
       await gapi.client.init({});
       await gapi.client.load('drive', 'v3');
       await gapi.client.load('docs', 'v1');
+      await gapi.client.load('sheets', 'v4');
       console.log('Google APIs loaded successfully.');
       
       // Restore access token from session if available and valid
@@ -132,7 +133,7 @@ function autoRenewToken() {
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: settings.googleClientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       callback: (tokenResponse) => {
         if (tokenResponse.error !== undefined) {
           updateGDriveStatus('disconnected');
@@ -189,7 +190,7 @@ function connectGoogleDrive() {
     // Initialize token client with user's client ID
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: settings.googleClientId,
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
       callback: (tokenResponse) => {
         if (tokenResponse.error !== undefined) {
           updateGDriveStatus('disconnected');
@@ -940,5 +941,103 @@ async function pullAndMergeDataFromDrive() {
   } catch (err) {
     console.error('PulseFit sync/pull failed:', err);
     return false;
+  }
+}
+
+// --- Create Google Sheet for Access Control inside the 'Pulsefit' folder ---
+async function createAccessControlSheet() {
+  if (!isGDriveConnected()) {
+    alert("Please connect Google Drive first to set up access control.");
+    return;
+  }
+
+  const createBtn = document.getElementById('create-access-sheet-btn');
+  const originalHtml = createBtn.innerHTML;
+  createBtn.disabled = true;
+  createBtn.innerHTML = '<div class="loading-spinner" style="width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; margin-right: 6px;"></div> Creating...';
+
+  try {
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
+    const folderId = await getOrCreateFolder(folderName);
+
+    // 1. Search if a file named 'Pulsefit_Access_Control' already exists in parents
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = 'Pulsefit_Access_Control' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    let spreadsheetId = null;
+    const files = searchResponse.result.files;
+
+    if (files && files.length > 0) {
+      spreadsheetId = files[0].id;
+      console.log(`Access Control spreadsheet already exists with ID: ${spreadsheetId}`);
+    } else {
+      // 2. Create a new Spreadsheet
+      const createResponse = await gapi.client.drive.files.create({
+        resource: {
+          name: 'Pulsefit_Access_Control',
+          mimeType: 'application/vnd.google-apps.spreadsheet',
+          parents: [folderId]
+        },
+        fields: 'id'
+      });
+      spreadsheetId = createResponse.result.id;
+      console.log(`Created new Access Control spreadsheet with ID: ${spreadsheetId}`);
+
+      // 3. Populate spreadsheet with headers and first row containing admin email
+      let adminEmail = 'Saurabh';
+      try {
+        const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { 'Authorization': `Bearer ${gdriveAccessToken}` }
+        });
+        if (userInfoResponse.ok) {
+          const userInfo = await userInfoResponse.json();
+          adminEmail = userInfo.email;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch admin email from UserInfo endpoint:', err);
+      }
+
+      const values = [
+        ['Email', 'Status', 'Requested Date', 'Approved Date'],
+        [adminEmail, 'Approved', new Date().toLocaleDateString(), new Date().toLocaleDateString()]
+      ];
+
+      // Update the values using sheets API
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: spreadsheetId,
+        range: 'Sheet1!A1:D2',
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: values
+        }
+      });
+      console.log('Populated spreadsheet rows.');
+    }
+
+    // 4. Set permission to public read-only (anyone with the link can view)
+    await gapi.client.drive.permissions.create({
+      fileId: spreadsheetId,
+      resource: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+    console.log('Granted public read-only permission.');
+
+    // 5. Update UI
+    document.getElementById('settings-access-sheet-id').value = spreadsheetId;
+    
+    // Show a beautiful modal detailing the next steps
+    alert(`Success!\n\nAccess Control Google Sheet has been successfully created in your 'Pulsefit' folder.\n\nSpreadsheet ID: ${spreadsheetId}\n\nTo activate it, please copy this Spreadsheet ID and send it in the chat so I can update the app's code!`);
+
+  } catch (err) {
+    console.error('Failed to create access control sheet:', err);
+    alert(`Error setting up access control sheet: ${err.message || err}`);
+  } finally {
+    createBtn.disabled = false;
+    createBtn.innerHTML = originalHtml;
   }
 }
