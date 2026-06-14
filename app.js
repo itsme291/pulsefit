@@ -82,7 +82,7 @@ let settings = {
 };
 
 // --- Access Control (Approval Gate) ---
-const ACCESS_SHEET_ID = '1ItvM_wOrUzWsgnE2OOXptuEwGJO7NH8Q7CjpScBIKFk';
+const ACCESS_SHEET_ID = '1ltvM_wOrUzWsgnE2OOXptuEwGJO7NH8Q7CjpScBlKFk';
 
 // --- Timer & Visuals State ---
 let workoutTimerInterval = null;
