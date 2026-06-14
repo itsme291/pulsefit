@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=20">
+  <link rel="stylesheet" href="styles.css?v=22">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=20" defer></script>
-  <script src="gemini.js?v=20" defer></script>
-  <script src="app.js?v=20" defer></script>
+  <script src="gdrive.js?v=22" defer></script>
+  <script src="gemini.js?v=22" defer></script>
+  <script src="app.js?v=22" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -602,6 +602,13 @@
           <!-- Preferences -->
           <div class="settings-section">
             <label class="settings-label">Preferences</label>
+            <div class="settings-row">
+              <span>User Name</span>
+              <div class="input-with-button" style="width: 60%; margin: 0; display: flex; gap: 8px;">
+                <input type="text" id="settings-username" placeholder="Enter name (e.g. Saurabh)" style="flex-grow: 1; height: 32px; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255,255,255,0.03); color: var(--text-primary); font-size: 13px;">
+                <button class="btn btn-secondary btn-sm" id="save-username-btn" style="height: 32px; padding: 0 10px; font-size: 11px;">Save</button>
+              </div>
+            </div>
             <div class="settings-row">
               <span>Weight Unit</span>
               <div class="toggle-group">

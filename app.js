@@ -73,11 +73,12 @@ let activeWorkout = null;
 let settings = {
   apiKey: '',
   googleClientId: '413477786705-cks607s474q3tn75dm4fh5l5pnci7rmc.apps.googleusercontent.com',
-  googleFolder: 'PulseFit Workouts',
+  googleFolder: 'Pulsefit',
   weightUnit: 'lbs',
   defaultRest: 90,
   timerSound: true,
-  activeModel: 'gemini-3.5-flash'
+  activeModel: 'gemini-3.5-flash',
+  userName: 'Saurabh'
 };
 
 // --- Timer & Visuals State ---
@@ -313,6 +314,20 @@ function initUI() {
   document.getElementById('import-data-file').addEventListener('change', importData);
   document.getElementById('reset-app-btn').addEventListener('click', resetAppData);
   
+  // Save Username Listener
+  document.getElementById('save-username-btn').addEventListener('click', () => {
+    const nameInput = document.getElementById('settings-username');
+    const nameValue = nameInput.value.trim();
+    if (!nameValue) {
+      alert('User Name cannot be empty!');
+      return;
+    }
+    settings.userName = nameValue;
+    saveSettings();
+    updateUserNameUI();
+    alert('User Name saved successfully!');
+  });
+
   // Google Drive Sync Listeners
   document.getElementById('save-google-client-id-btn').addEventListener('click', () => {
     const cid = document.getElementById('settings-google-client-id').value.trim();
@@ -412,13 +427,16 @@ function initUI() {
   document.getElementById('timer-skip').addEventListener('click', skipRestTimer);
   
   // Init Settings Fields
+  document.getElementById('settings-username').value = settings.userName || 'Saurabh';
   document.getElementById('settings-api-key').value = settings.apiKey;
   document.getElementById('settings-google-client-id').value = settings.googleClientId || '';
-  document.getElementById('settings-google-folder').value = settings.googleFolder || 'PulseFit Workouts';
+  document.getElementById('settings-google-folder').value = settings.googleFolder || 'Pulsefit';
   if (settings.weightUnit === 'kg') {
     unitLbs.classList.remove('active');
     unitKg.classList.add('active');
   }
+  
+  updateUserNameUI();
   
   if (typeof updateGDriveStatus === 'function') {
     updateGDriveStatus(isGDriveConnected() ? 'connected' : 'disconnected');
@@ -2489,6 +2507,10 @@ function mergePulseFitData(backupData) {
       settings.timerSound = s.timerSound;
       changed = true;
     }
+    if (s.userName && s.userName !== settings.userName) {
+      settings.userName = s.userName;
+      changed = true;
+    }
   }
 
   // 2. Merge nutritionTargets
@@ -2552,7 +2574,25 @@ function mergePulseFitData(backupData) {
     saveExercises();
     saveHistory();
     saveNutritionLog();
+    updateUserNameUI();
   }
   
   return changed;
+}
+
+// --- Update UI with User Name ---
+function updateUserNameUI() {
+  const name = settings.userName || 'Saurabh';
+  
+  // 1. Update topbar branding
+  const topbarBranding = document.querySelector('.topbar-left div');
+  if (topbarBranding) {
+    topbarBranding.textContent = `${name}'s PulseFit`;
+  }
+  
+  // 2. Update homepage welcome banner
+  const welcomeTitle = document.querySelector('.welcome-header h2');
+  if (welcomeTitle) {
+    welcomeTitle.textContent = `Welcome, ${name}!`;
+  }
 }

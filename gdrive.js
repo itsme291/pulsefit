@@ -519,7 +519,7 @@ async function syncWorkoutToDrive(workout) {
     if (typeof gapi !== 'undefined' && gapi.client) {
       gapi.client.setToken({ access_token: gdriveAccessToken });
     }
-    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
     const folderId = await getOrCreateFolder(folderName);
     
     console.log(`Searching for Google Doc 'PulseFit_Workout_Log' in folder '${folderName}'...`);
@@ -587,7 +587,7 @@ async function viewDriveLog() {
       gapi.client.setToken({ access_token: gdriveAccessToken });
     }
     
-    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
     console.log(`Searching for Google Doc 'PulseFit_Workout_Log' in folder '${folderName}'...`);
     
     // 1. Find the parent folder
@@ -654,7 +654,7 @@ async function syncNutritionToDrive(nutritionLog) {
     if (typeof gapi !== 'undefined' && gapi.client) {
       gapi.client.setToken({ access_token: gdriveAccessToken });
     }
-    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
     const folderId = await getOrCreateFolder(folderName);
     
     console.log(`Searching for Google Doc 'PulseFit_macros' in folder '${folderName}'...`);
@@ -800,7 +800,7 @@ async function backupDataToDrive() {
   }
   
   try {
-    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
     const folderId = await getOrCreateFolder(folderName);
     
     // Compile all local data to sync
@@ -813,7 +813,8 @@ async function backupDataToDrive() {
         weightUnit: settings.weightUnit,
         defaultRest: settings.defaultRest,
         timerSound: settings.timerSound,
-        activeModel: settings.activeModel
+        activeModel: settings.activeModel,
+        userName: settings.userName
       },
       lastSynced: Date.now()
     };
@@ -891,7 +892,7 @@ async function pullAndMergeDataFromDrive() {
   }
   
   try {
-    const folderName = (settings.googleFolder || 'PulseFit Workouts').trim();
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
     const folderId = await getOrCreateFolder(folderName);
     
     // Search for existing backup file
