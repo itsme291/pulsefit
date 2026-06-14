@@ -291,24 +291,30 @@ function updateGDriveStatus(status) {
     if (status === 'connected') {
       headerPill.className = 'api-status-pill success';
       headerText.textContent = 'Drive: Connected';
-      const icon = headerPill.querySelector('i');
+      const icon = headerPill.querySelector('i, svg');
       if (icon) {
-        icon.setAttribute('data-lucide', 'cloud');
+        const newIcon = document.createElement('i');
+        newIcon.setAttribute('data-lucide', 'cloud');
+        icon.parentNode.replaceChild(newIcon, icon);
       }
     } else if (status === 'connecting') {
       headerPill.className = 'api-status-pill success';
       headerText.textContent = 'Drive: Connecting...';
-      const icon = headerPill.querySelector('i');
+      const icon = headerPill.querySelector('i, svg');
       if (icon) {
-        icon.setAttribute('data-lucide', 'refresh-cw');
+        const newIcon = document.createElement('i');
+        newIcon.setAttribute('data-lucide', 'refresh-cw');
+        icon.parentNode.replaceChild(newIcon, icon);
       }
     } else {
       const previouslyConnected = localStorage.getItem('pulsefit_gdrive_connected') === 'true';
       headerPill.className = 'api-status-pill error';
       headerText.textContent = previouslyConnected ? 'Drive: Reconnect' : 'Drive: Disconnected';
-      const icon = headerPill.querySelector('i');
+      const icon = headerPill.querySelector('i, svg');
       if (icon) {
-        icon.setAttribute('data-lucide', 'cloud-off');
+        const newIcon = document.createElement('i');
+        newIcon.setAttribute('data-lucide', 'cloud-off');
+        icon.parentNode.replaceChild(newIcon, icon);
       }
     }
   }
@@ -323,7 +329,10 @@ function updateGDriveStatus(status) {
         homeIconBg.style.color = 'var(--success)';
       }
       if (homeIcon) {
-        homeIcon.setAttribute('data-lucide', 'cloud');
+        const newIcon = document.createElement('i');
+        newIcon.id = 'gdrive-home-icon';
+        newIcon.setAttribute('data-lucide', 'cloud');
+        homeIcon.parentNode.replaceChild(newIcon, homeIcon);
       }
       
       homeActionBtn.className = 'btn btn-outline-primary btn-sm';
@@ -341,7 +350,10 @@ function updateGDriveStatus(status) {
         homeIconBg.style.color = 'var(--danger)';
       }
       if (homeIcon) {
-        homeIcon.setAttribute('data-lucide', 'cloud-off');
+        const newIcon = document.createElement('i');
+        newIcon.id = 'gdrive-home-icon';
+        newIcon.setAttribute('data-lucide', 'cloud-off');
+        homeIcon.parentNode.replaceChild(newIcon, homeIcon);
       }
       
       homeActionBtn.className = 'btn btn-primary btn-sm';
