@@ -2747,8 +2747,8 @@ async function verifyUserAccess(token) {
     let approved = false;
     let found = false;
 
-    // Row loop (skipping header)
-    for (let i = 1; i < rows.length; i++) {
+    // Row loop (checking all rows, dynamically skipping header)
+    for (let i = 0; i < rows.length; i++) {
       const line = rows[i].trim();
       if (!line) continue;
       
@@ -2756,6 +2756,9 @@ async function verifyUserAccess(token) {
       if (cols.length > 0) {
         const rowEmail = cols[0].trim().toLowerCase();
         const rowStatus = cols[1] ? cols[1].trim().toLowerCase() : '';
+
+        // Skip header row if present
+        if (rowEmail === 'email') continue;
 
         if (rowEmail === email) {
           found = true;
