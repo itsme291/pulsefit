@@ -957,6 +957,12 @@ async function createAccessControlSheet() {
   createBtn.innerHTML = '<div class="loading-spinner" style="width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; margin-right: 6px;"></div> Creating...';
 
   try {
+    // Dynamically load sheets API if not already loaded
+    if (!gapi.client.sheets) {
+      console.log('Sheets API not loaded. Loading now...');
+      await gapi.client.load('sheets', 'v4');
+    }
+
     const folderName = (settings.googleFolder || 'Pulsefit').trim();
     const folderId = await getOrCreateFolder(folderName);
 
@@ -1035,7 +1041,17 @@ async function createAccessControlSheet() {
 
   } catch (err) {
     console.error('Failed to create access control sheet:', err);
-    alert(`Error setting up access control sheet: ${err.message || err}`);
+    let errMsg = '';
+    if (err && err.result && err.result.error && err.result.error.message) {
+      errMsg = err.result.error.message;
+    } else if (err && err.message) {
+      errMsg = err.message;
+    } else if (typeof err === 'object') {
+      errMsg = JSON.stringify(err);
+    } else {
+      errMsg = String(err);
+    }
+    alert(`Error setting up access control sheet: ${errMsg}\n\nTip: If you were already connected to Google Drive, try disconnecting (from Google settings or clearing cache) and signing in again to authorize the new email permission.`);
   } finally {
     createBtn.disabled = false;
     createBtn.innerHTML = originalHtml;
