@@ -385,41 +385,8 @@ function initUI() {
   });
   
   document.getElementById('sync-gdrive-data-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('sync-gdrive-data-btn');
-    const originalHTML = btn.innerHTML;
-    try {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-      
-      let dbSuccess = false;
-      let workoutSuccess = false;
-      let nutritionSuccess = false;
-      
-      if (typeof pullAndMergeDataFromDrive === 'function') {
-        dbSuccess = await pullAndMergeDataFromDrive();
-      }
-      if (typeof regenerateWorkoutDocLog === 'function') {
-        workoutSuccess = await regenerateWorkoutDocLog();
-      }
-      if (typeof syncNutritionToDrive === 'function') {
-        nutritionSuccess = await syncNutritionToDrive(nutritionLog);
-      }
-      
-      if (dbSuccess || workoutSuccess || nutritionSuccess) {
-        alert('Synchronization complete! Raw backup updated and Google Docs regenerated.');
-        renderNutritionTab();
-        renderHistory();
-        renderRoutineTemplates();
-      } else {
-        alert('Synchronization failed. Please check your network and Google Drive connection.');
-      }
-    } catch (err) {
-      console.error("Manual sync failed:", err);
-      alert(`Sync Error: ${err.message}`);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-      if (window.lucide) window.lucide.createIcons();
+    if (typeof syncEverythingNow === 'function') {
+      await syncEverythingNow();
     }
   });
   

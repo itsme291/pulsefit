@@ -40,18 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const headerPill = document.getElementById('header-gdrive-status-pill');
   if (headerPill) {
     headerPill.addEventListener('click', () => {
-      if (gdriveAccessToken && gdriveTokenExpiry && gdriveTokenExpiry > Date.now()) {
+      if (isGDriveConnected()) {
         console.log('Header GDrive status pill clicked: initiating manual sync...');
-        pullAndMergeDataFromDrive().then(success => {
-          if (success) {
-            if (typeof renderNutritionTab === 'function') renderNutritionTab();
-            if (typeof renderHistory === 'function') renderHistory();
-            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
-            alert('Google Drive data synced successfully!');
-          } else {
-            alert('Sync completed. Local data is already up-to-date.');
-          }
-        });
+        syncEverythingNow();
       } else {
         console.log('Header GDrive status pill clicked: initiating re-connection popup...');
         connectGoogleDrive();
@@ -63,18 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const homeActionBtn = document.getElementById('gdrive-home-action-btn');
   if (homeActionBtn) {
     homeActionBtn.addEventListener('click', () => {
-      if (gdriveAccessToken && gdriveTokenExpiry && gdriveTokenExpiry > Date.now()) {
+      if (isGDriveConnected()) {
         console.log('Home GDrive action button clicked: initiating manual sync...');
-        pullAndMergeDataFromDrive().then(success => {
-          if (success) {
-            if (typeof renderNutritionTab === 'function') renderNutritionTab();
-            if (typeof renderHistory === 'function') renderHistory();
-            if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
-            alert('Google Drive data synced successfully!');
-          } else {
-            alert('Sync completed. Local data is already up-to-date.');
-          }
-        });
+        syncEverythingNow();
       } else {
         console.log('Home GDrive action button clicked: initiating connection popup...');
         connectGoogleDrive();
@@ -260,14 +242,14 @@ function updateGDriveStatus(status) {
   const homeActionBtn = document.getElementById('gdrive-home-action-btn');
   
   if (badge && connectBtn) {
-    badge.className = `gdrive-status-badge ${status}`;
+    badge.className = `gdrive-status-badge ${status === 'syncing' ? 'connected' : status}`;
     
     if (viewLogBtn) {
-      viewLogBtn.disabled = (status !== 'connected');
+      viewLogBtn.disabled = (status !== 'connected' && status !== 'syncing');
     }
     
     if (syncDataBtn) {
-      syncDataBtn.disabled = (status !== 'connected');
+      syncDataBtn.disabled = (status !== 'connected' && status !== 'syncing');
     }
     
     if (status === 'connected') {
@@ -277,6 +259,9 @@ function updateGDriveStatus(status) {
       connectBtn.disabled = false;
     } else if (status === 'connecting') {
       badge.textContent = 'Connecting...';
+      connectBtn.disabled = true;
+    } else if (status === 'syncing') {
+      badge.textContent = 'Syncing...';
       connectBtn.disabled = true;
     } else {
       badge.textContent = 'Disconnected';
@@ -295,6 +280,15 @@ function updateGDriveStatus(status) {
       if (icon) {
         const newIcon = document.createElement('i');
         newIcon.setAttribute('data-lucide', 'cloud');
+        icon.parentNode.replaceChild(newIcon, icon);
+      }
+    } else if (status === 'syncing') {
+      headerPill.className = 'api-status-pill success';
+      headerText.textContent = 'Drive: Syncing...';
+      const icon = headerPill.querySelector('i, svg');
+      if (icon) {
+        const newIcon = document.createElement('i');
+        newIcon.setAttribute('data-lucide', 'refresh-cw');
         icon.parentNode.replaceChild(newIcon, icon);
       }
     } else if (status === 'connecting') {
@@ -338,6 +332,23 @@ function updateGDriveStatus(status) {
       homeActionBtn.className = 'btn btn-outline-primary btn-sm';
       homeActionBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Sync Now';
       homeActionBtn.disabled = false;
+    } else if (status === 'syncing') {
+      homeStatusText.textContent = 'Sync Status: Syncing...';
+      
+      if (homeIconBg) {
+        homeIconBg.style.background = 'rgba(16, 185, 129, 0.1)';
+        homeIconBg.style.color = 'var(--success)';
+      }
+      if (homeIcon) {
+        const newIcon = document.createElement('i');
+        newIcon.id = 'gdrive-home-icon';
+        newIcon.setAttribute('data-lucide', 'refresh-cw');
+        homeIcon.parentNode.replaceChild(newIcon, homeIcon);
+      }
+      
+      homeActionBtn.className = 'btn btn-outline-primary btn-sm';
+      homeActionBtn.innerHTML = '<div class="loading-spinner" style="width: 12px; height: 12px; border: 2px solid rgba(255,255,255,0.1); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; display: inline-block; margin-right: 6px;"></div> Syncing...';
+      homeActionBtn.disabled = true;
     } else if (status === 'connecting') {
       homeStatusText.textContent = 'Sync Status: Connecting...';
       homeActionBtn.disabled = true;
@@ -607,6 +618,8 @@ async function syncWorkoutToDrive(workout) {
     return false;
   }
   
+  updateGDriveStatus('syncing');
+  
   try {
     // Ensure token is registered with GAPI client
     if (typeof gapi !== 'undefined' && gapi.client) {
@@ -657,6 +670,8 @@ async function syncWorkoutToDrive(workout) {
   } catch (err) {
     console.error('Google Doc Sync Error:', err);
     return false;
+  } finally {
+    updateGDriveStatus('connected');
   }
 }
 
@@ -758,6 +773,8 @@ async function syncNutritionToDrive(nutritionLog) {
     updateMacrosSyncStatus('Disconnected');
     return false;
   }
+  
+  updateGDriveStatus('syncing');
   
   try {
     updateMacrosSyncStatus('Syncing...');
@@ -885,6 +902,8 @@ async function syncNutritionToDrive(nutritionLog) {
     console.error('Macros Doc Sync Error:', err);
     updateMacrosSyncStatus('Sync Failed');
     return false;
+  } finally {
+    updateGDriveStatus('connected');
   }
 }
 
@@ -914,6 +933,8 @@ async function backupDataToDrive() {
     console.log("Drive not connected. Backup skipped.");
     return false;
   }
+  
+  updateGDriveStatus('syncing');
   
   try {
     const folderName = (settings.googleFolder || 'Pulsefit').trim();
@@ -997,6 +1018,8 @@ async function backupDataToDrive() {
   } catch (err) {
     console.error('PulseFit backup failed:', err);
     return false;
+  } finally {
+    updateGDriveStatus('connected');
   }
 }
 
@@ -1010,6 +1033,8 @@ async function pullAndMergeDataFromDrive() {
     console.log("Drive not connected. Sync/pull skipped.");
     return false;
   }
+  
+  updateGDriveStatus('syncing');
   
   try {
     const folderName = (settings.googleFolder || 'Pulsefit').trim();
@@ -1060,6 +1085,8 @@ async function pullAndMergeDataFromDrive() {
   } catch (err) {
     console.error('PulseFit sync/pull failed:', err);
     return false;
+  } finally {
+    updateGDriveStatus('connected');
   }
 }
 
@@ -1288,4 +1315,43 @@ async function regenerateWorkoutDocLog() {
     return false;
   }
 }
+
+// --- Consolidated Manual Sync Action ---
+async function syncEverythingNow() {
+  updateGDriveStatus('syncing');
+  
+  let dbSuccess = false;
+  let workoutSuccess = false;
+  let nutritionSuccess = false;
+  
+  try {
+    if (typeof pullAndMergeDataFromDrive === 'function') {
+      dbSuccess = await pullAndMergeDataFromDrive();
+    }
+    if (typeof regenerateWorkoutDocLog === 'function') {
+      workoutSuccess = await regenerateWorkoutDocLog();
+    }
+    if (typeof syncNutritionToDrive === 'function') {
+      nutritionSuccess = await syncNutritionToDrive(nutritionLog);
+    }
+    
+    if (dbSuccess || workoutSuccess || nutritionSuccess) {
+      alert('Synchronization complete! Raw backup updated and Google Docs regenerated.');
+      if (typeof renderNutritionTab === 'function') renderNutritionTab();
+      if (typeof renderHistory === 'function') renderHistory();
+      if (typeof renderRoutineTemplates === 'function') renderRoutineTemplates();
+      return true;
+    } else {
+      alert('Synchronization failed. Please check your network and Google Drive connection.');
+      return false;
+    }
+  } catch (err) {
+    console.error("Consolidated sync failed:", err);
+    alert(`Sync Error: ${err.message || err}`);
+    return false;
+  } finally {
+    updateGDriveStatus('connected');
+  }
+}
+
 
