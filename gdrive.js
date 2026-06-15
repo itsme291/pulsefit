@@ -248,6 +248,8 @@ function updateGDriveStatus(status) {
   const connectBtn = document.getElementById('connect-gdrive-btn');
   const viewLogBtn = document.getElementById('view-gdrive-log-btn');
   const syncDataBtn = document.getElementById('sync-gdrive-data-btn');
+  const regenWorkoutBtn = document.getElementById('regenerate-workout-doc-btn');
+  const regenNutritionBtn = document.getElementById('regenerate-nutrition-doc-btn');
   
   // Header pill elements
   const headerPill = document.getElementById('header-gdrive-status-pill');
@@ -268,6 +270,14 @@ function updateGDriveStatus(status) {
     
     if (syncDataBtn) {
       syncDataBtn.disabled = (status !== 'connected');
+    }
+    
+    if (regenWorkoutBtn) {
+      regenWorkoutBtn.disabled = (status !== 'connected');
+    }
+    
+    if (regenNutritionBtn) {
+      regenNutritionBtn.disabled = (status !== 'connected');
     }
     
     if (status === 'connected') {
@@ -370,6 +380,76 @@ function updateGDriveStatus(status) {
 // --- Check if Token is Valid ---
 function isGDriveConnected() {
   return gdriveAccessToken && gdriveTokenExpiry && gdriveTokenExpiry > Date.now();
+}
+
+// --- Proactive Token Renewal wrapped in a Promise ---
+function renewTokenPromise() {
+  return new Promise((resolve) => {
+    if (isGDriveConnected()) {
+      resolve(true);
+      return;
+    }
+    
+    if (localStorage.getItem('pulsefit_gdrive_connected') !== 'true') {
+      resolve(false);
+      return;
+    }
+    
+    if (!settings.googleClientId || settings.googleClientId.trim() === '') {
+      updateGDriveStatus('disconnected');
+      resolve(false);
+      return;
+    }
+    
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      console.warn('Google accounts library not loaded.');
+      resolve(false);
+      return;
+    }
+    
+    updateGDriveStatus('connecting');
+    
+    try {
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: settings.googleClientId,
+        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email',
+        callback: (tokenResponse) => {
+          if (tokenResponse.error !== undefined) {
+            updateGDriveStatus('disconnected');
+            console.error('Auto-renew Promise Callback Error:', tokenResponse);
+            resolve(false);
+            return;
+          }
+          
+          gdriveAccessToken = tokenResponse.access_token;
+          gdriveTokenExpiry = Date.now() + (tokenResponse.expires_in * 1000);
+          
+          localStorage.setItem('pulsefit_gdrive_token', gdriveAccessToken);
+          localStorage.setItem('pulsefit_gdrive_token_expires', gdriveTokenExpiry.toString());
+          localStorage.setItem('pulsefit_gdrive_connected', 'true');
+          
+          if (typeof gapi !== 'undefined' && gapi.client) {
+            gapi.client.setToken({ access_token: gdriveAccessToken });
+          }
+          
+          updateGDriveStatus('connected');
+          console.log('Google Drive auto-renewed token successfully via Promise!');
+          resolve(true);
+        },
+        error_callback: (err) => {
+          updateGDriveStatus('disconnected');
+          console.error('Auto-renew Promise OAuth Error:', err);
+          resolve(false);
+        }
+      });
+      
+      tokenClient.requestAccessToken({ prompt: '' });
+    } catch (err) {
+      updateGDriveStatus('disconnected');
+      console.error('Auto-renew Promise failed to initiate:', err);
+      resolve(false);
+    }
+  });
 }
 
 // --- Compile Workout to Human-Readable Text ---
@@ -522,6 +602,16 @@ async function prependWorkoutLog(fileId, text) {
 
 // --- Sync Workout Log with Google Doc PulseFit_Workout_Log ---
 async function syncWorkoutToDrive(workout) {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    console.log('Workout sync triggered but token expired. Attempting token renewal...');
+    const renewed = await renewTokenPromise();
+    if (!renewed) {
+      console.warn('Silent token renewal failed during workout sync.');
+      alert('Google Drive token expired. Workout sync failed. Please reconnect in Settings.');
+      return false;
+    }
+  }
+
   if (!isGDriveConnected()) {
     console.warn('Google Drive not authorized or expired. Sync skipped.');
     return false;
@@ -582,6 +672,14 @@ async function syncWorkoutToDrive(workout) {
 
 // --- View current Google Doc contents by exporting it to plain text ---
 async function viewDriveLog() {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    const renewed = await renewTokenPromise();
+    if (!renewed) {
+      alert('Google Drive token expired. Please reconnect in Settings.');
+      return;
+    }
+  }
+
   if (!isGDriveConnected()) {
     alert('Please connect Google Drive first.');
     return;
@@ -654,6 +752,17 @@ async function viewDriveLog() {
 
 // --- Sync Daily Macros Log with Google Doc PulseFit_macros ---
 async function syncNutritionToDrive(nutritionLog) {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    console.log('Nutrition sync triggered but token expired. Attempting token renewal...');
+    const renewed = await renewTokenPromise();
+    if (!renewed) {
+      console.warn('Silent token renewal failed during nutrition sync.');
+      updateMacrosSyncStatus('Sync Failed');
+      alert('Google Drive token expired. Nutrition sync failed. Please reconnect in Settings.');
+      return false;
+    }
+  }
+
   if (!isGDriveConnected()) {
     console.warn('Google Drive not authorized or expired. Macros sync skipped.');
     updateMacrosSyncStatus('Disconnected');
@@ -807,6 +916,10 @@ function updateMacrosSyncStatus(statusText) {
 
 // --- Backup all PulseFit structured data to Google Drive as JSON ---
 async function backupDataToDrive() {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    const renewed = await renewTokenPromise();
+    if (!renewed) return false;
+  }
   if (!isGDriveConnected()) {
     console.log("Drive not connected. Backup skipped.");
     return false;
@@ -899,6 +1012,10 @@ async function backupDataToDrive() {
 
 // --- Pull all PulseFit structured data from Google Drive and merge with local storage ---
 async function pullAndMergeDataFromDrive() {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    const renewed = await renewTokenPromise();
+    if (!renewed) return false;
+  }
   if (!isGDriveConnected()) {
     console.log("Drive not connected. Sync/pull skipped.");
     return false;
@@ -1069,3 +1186,116 @@ async function createAccessControlSheet() {
     createBtn.innerHTML = originalHtml;
   }
 }
+
+// --- Overwrite Google Doc PulseFit_Workout_Log with entire local history (newest first) ---
+async function regenerateWorkoutDocLog() {
+  if (!isGDriveConnected() && localStorage.getItem('pulsefit_gdrive_connected') === 'true') {
+    console.log('Workout doc regeneration triggered but token expired. Attempting renewal...');
+    const renewed = await renewTokenPromise();
+    if (!renewed) {
+      alert('Google Drive token expired. Re-regeneration failed. Please connect Google Drive first.');
+      return false;
+    }
+  }
+
+  if (!isGDriveConnected()) {
+    alert('Please connect Google Drive first.');
+    return false;
+  }
+
+  try {
+    // Ensure token is registered with GAPI client
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
+    const folderId = await getOrCreateFolder(folderName);
+    
+    console.log(`Searching for Google Doc 'PulseFit_Workout_Log' in folder '${folderName}'...`);
+    
+    // 1. Search for existing Google Doc in parent folder
+    const searchResponse = await gapi.client.drive.files.list({
+      q: `name = 'PulseFit_Workout_Log' and mimeType = 'application/vnd.google-apps.document' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const files = searchResponse.result.files;
+    let fileId = null;
+    
+    // Sort history by startTime descending (newest first)
+    const sortedHistory = [...workoutHistory].sort((a, b) => b.startTime - a.startTime);
+    
+    let docContent = `PULSEFIT WORKOUT DATABASE\n=========================\nThis document stores your logged workouts. Your Gemini AI Workspace extension reads this file to analyze details.\n\n`;
+    sortedHistory.forEach(workout => {
+      docContent += formatWorkoutForFile(workout) + "\n";
+    });
+    
+    if (files && files.length > 0) {
+      fileId = files[0].id;
+      console.log('Clearing and overwriting existing Google Doc PulseFit_Workout_Log...');
+      
+      // Clear Doc content first
+      const docResponse = await gapi.client.docs.documents.get({ documentId: fileId });
+      const bodyContent = docResponse.result.body.content;
+      const lastElement = bodyContent[bodyContent.length - 1];
+      const endIndex = Math.max(1, lastElement.endIndex - 1);
+      
+      if (endIndex > 1) {
+        try {
+          await gapi.client.docs.documents.batchUpdate({
+            documentId: fileId,
+            resource: {
+              requests: [{
+                deleteContentRange: {
+                  range: {
+                    startIndex: 1,
+                    endIndex: endIndex
+                  }
+                }
+              }]
+            }
+          });
+        } catch (delErr) {
+          console.warn('Google Doc clear request failed, will attempt to insert anyway:', delErr);
+        }
+      }
+      
+      // Now insert the new content
+      await gapi.client.docs.documents.batchUpdate({
+        documentId: fileId,
+        resource: {
+          requests: [{
+            insertText: {
+              location: {
+                index: 1
+              },
+              text: docContent
+            }
+          }]
+        }
+      });
+    } else {
+      // Create Doc
+      const createResponse = await gapi.client.drive.files.create({
+        resource: {
+          name: 'PulseFit_Workout_Log',
+          mimeType: 'application/vnd.google-apps.document',
+          parents: [folderId]
+        },
+        fields: 'id'
+      });
+      
+      fileId = createResponse.result.id;
+      console.log('Created new Google Doc PulseFit_Workout_Log in GDrive folder...');
+      await appendDocContent(fileId, docContent);
+    }
+    
+    console.log('Workout Doc regenerated successfully!');
+    return true;
+  } catch (err) {
+    console.error('Workout Doc Regeneration Error:', err);
+    return false;
+  }
+}
+

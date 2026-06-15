@@ -17,16 +17,16 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=27">
+  <link rel="stylesheet" href="styles.css?v=28">
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
   <script src="https://accounts.google.com/gsi/client"></script>
   
   <!-- App Handlers -->
-  <script src="gdrive.js?v=27" defer></script>
-  <script src="gemini.js?v=27" defer></script>
-  <script src="app.js?v=27" defer></script>
+  <script src="gdrive.js?v=28" defer></script>
+  <script src="gemini.js?v=28" defer></script>
+  <script src="app.js?v=28" defer></script>
 </head>
 <body>
   <div class="app-container">
@@ -566,6 +566,15 @@
                </button>
                <button class="btn btn-outline-primary btn-sm" id="sync-gdrive-data-btn" style="flex-grow:1;" disabled>
                  <i data-lucide="refresh-cw"></i> Sync Data
+               </button>
+             </div>
+             
+             <div class="gdrive-regenerate-panel margin-top-10" style="display:flex; gap:10px;">
+               <button class="btn btn-outline-secondary btn-sm" id="regenerate-workout-doc-btn" style="flex-grow:1;" disabled>
+                 <i data-lucide="file-text"></i> Sync All Workouts to Doc
+               </button>
+               <button class="btn btn-outline-secondary btn-sm" id="regenerate-nutrition-doc-btn" style="flex-grow:1;" disabled>
+                 <i data-lucide="file-text"></i> Sync All Nutrition to Doc
                </button>
              </div>
             

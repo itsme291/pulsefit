@@ -411,6 +411,54 @@ function initUI() {
       if (window.lucide) window.lucide.createIcons();
     }
   });
+
+  document.getElementById('regenerate-workout-doc-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('regenerate-workout-doc-btn');
+    const originalHTML = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      if (typeof regenerateWorkoutDocLog === 'function') {
+        const success = await regenerateWorkoutDocLog();
+        if (success) {
+          alert('Successfully synced all workouts to Google Doc (PulseFit_Workout_Log)!');
+        } else {
+          alert('Failed to sync workouts to Google Drive doc. Verify your connection.');
+        }
+      }
+    } catch (err) {
+      console.error("Workout doc regeneration failed:", err);
+      alert(`Sync Error: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
+
+  document.getElementById('regenerate-nutrition-doc-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('regenerate-nutrition-doc-btn');
+    const originalHTML = btn.innerHTML;
+    try {
+      btn.disabled = true;
+      btn.textContent = 'Syncing...';
+      if (typeof syncNutritionToDrive === 'function') {
+        const success = await syncNutritionToDrive(nutritionLog);
+        if (success) {
+          alert('Successfully synced all nutrition logs to Google Doc (PulseFit_macros)!');
+        } else {
+          alert('Failed to sync nutrition logs to Google Drive doc. Verify your connection.');
+        }
+      }
+    } catch (err) {
+      console.error("Nutrition doc regeneration failed:", err);
+      alert(`Sync Error: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+      if (window.lucide) window.lucide.createIcons();
+    }
+  });
   
   // Active Workout Buttons
   document.getElementById('start-workout-btn').addEventListener('click', () => startWorkout());
@@ -1119,9 +1167,9 @@ function finishActiveWorkout() {
   skipRestTimer();
   
   // Check Google Drive Sync
-  if (typeof isGDriveConnected === 'function' && isGDriveConnected()) {
-    // Show a temporary visual indication
-    console.log("Google Drive connected, syncing workout in background...");
+  const isPreviouslyConnected = localStorage.getItem('pulsefit_gdrive_connected') === 'true';
+  if (isPreviouslyConnected) {
+    console.log("Google Drive connected/previously connected, syncing workout in background...");
     syncWorkoutToDrive(finalWorkout).then(syncSuccess => {
       if (syncSuccess) {
         alert('Workout saved locally and successfully synced to Google Drive!');
@@ -1129,7 +1177,9 @@ function finishActiveWorkout() {
           backupDataToDrive();
         }
       } else {
-        alert('Workout saved locally, but Google Drive sync failed. Please check your credentials in Settings.');
+        if (isGDriveConnected()) {
+          alert('Workout saved locally, but Google Drive sync failed. Please check your credentials in Settings.');
+        }
       }
     });
   } else {
