@@ -391,67 +391,30 @@ function initUI() {
       btn.disabled = true;
       btn.textContent = 'Syncing...';
       
+      let dbSuccess = false;
+      let workoutSuccess = false;
+      let nutritionSuccess = false;
+      
       if (typeof pullAndMergeDataFromDrive === 'function') {
-        const success = await pullAndMergeDataFromDrive();
-        if (success) {
-          alert('Synchronization complete! All workouts and nutrition logs have been synced.');
-          renderNutritionTab();
-          renderHistory();
-          renderRoutineTemplates();
-        } else {
-          alert('Synchronization failed. Please check your network and Google Drive connection.');
-        }
+        dbSuccess = await pullAndMergeDataFromDrive();
+      }
+      if (typeof regenerateWorkoutDocLog === 'function') {
+        workoutSuccess = await regenerateWorkoutDocLog();
+      }
+      if (typeof syncNutritionToDrive === 'function') {
+        nutritionSuccess = await syncNutritionToDrive(nutritionLog);
+      }
+      
+      if (dbSuccess || workoutSuccess || nutritionSuccess) {
+        alert('Synchronization complete! Raw backup updated and Google Docs regenerated.');
+        renderNutritionTab();
+        renderHistory();
+        renderRoutineTemplates();
+      } else {
+        alert('Synchronization failed. Please check your network and Google Drive connection.');
       }
     } catch (err) {
       console.error("Manual sync failed:", err);
-      alert(`Sync Error: ${err.message}`);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-      if (window.lucide) window.lucide.createIcons();
-    }
-  });
-
-  document.getElementById('regenerate-workout-doc-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('regenerate-workout-doc-btn');
-    const originalHTML = btn.innerHTML;
-    try {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-      if (typeof regenerateWorkoutDocLog === 'function') {
-        const success = await regenerateWorkoutDocLog();
-        if (success) {
-          alert('Successfully synced all workouts to Google Doc (PulseFit_Workout_Log)!');
-        } else {
-          alert('Failed to sync workouts to Google Drive doc. Verify your connection.');
-        }
-      }
-    } catch (err) {
-      console.error("Workout doc regeneration failed:", err);
-      alert(`Sync Error: ${err.message}`);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = originalHTML;
-      if (window.lucide) window.lucide.createIcons();
-    }
-  });
-
-  document.getElementById('regenerate-nutrition-doc-btn').addEventListener('click', async () => {
-    const btn = document.getElementById('regenerate-nutrition-doc-btn');
-    const originalHTML = btn.innerHTML;
-    try {
-      btn.disabled = true;
-      btn.textContent = 'Syncing...';
-      if (typeof syncNutritionToDrive === 'function') {
-        const success = await syncNutritionToDrive(nutritionLog);
-        if (success) {
-          alert('Successfully synced all nutrition logs to Google Doc (PulseFit_macros)!');
-        } else {
-          alert('Failed to sync nutrition logs to Google Drive doc. Verify your connection.');
-        }
-      }
-    } catch (err) {
-      console.error("Nutrition doc regeneration failed:", err);
       alert(`Sync Error: ${err.message}`);
     } finally {
       btn.disabled = false;

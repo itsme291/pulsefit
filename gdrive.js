@@ -248,8 +248,6 @@ function updateGDriveStatus(status) {
   const connectBtn = document.getElementById('connect-gdrive-btn');
   const viewLogBtn = document.getElementById('view-gdrive-log-btn');
   const syncDataBtn = document.getElementById('sync-gdrive-data-btn');
-  const regenWorkoutBtn = document.getElementById('regenerate-workout-doc-btn');
-  const regenNutritionBtn = document.getElementById('regenerate-nutrition-doc-btn');
   
   // Header pill elements
   const headerPill = document.getElementById('header-gdrive-status-pill');
@@ -270,14 +268,6 @@ function updateGDriveStatus(status) {
     
     if (syncDataBtn) {
       syncDataBtn.disabled = (status !== 'connected');
-    }
-    
-    if (regenWorkoutBtn) {
-      regenWorkoutBtn.disabled = (status !== 'connected');
-    }
-    
-    if (regenNutritionBtn) {
-      regenNutritionBtn.disabled = (status !== 'connected');
     }
     
     if (status === 'connected') {
