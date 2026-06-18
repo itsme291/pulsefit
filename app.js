@@ -101,6 +101,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initNutrition();
   lucide.createIcons();
   initAccessCheck();
+  
+  // Auto-open settings if Google Drive was never connected
+  if (localStorage.getItem('pulsefit_gdrive_connected') !== 'true') {
+    openSettingsModal();
+  }
 });
 
 function loadData() {
@@ -638,12 +643,22 @@ function startWorkout(templateId = null) {
         category: dbExercise ? dbExercise.category : 'Other',
         restTime: te.restTime || 90, // Map routine rest time
         notes: te.notes || '',       // Map routine notes
-        sets: te.sets.map((s, index) => ({
-          weight: s.weight,
-          reps: s.reps,
-          completed: false,
-          type: s.type || 'normal'   // Map type (normal/warmup/etc)
-        }))
+        sets: te.sets.map((s, index) => {
+          const prevSets = getPreviousSetsForExercise(te.id);
+          let weight = s.weight;
+          let reps = s.reps;
+          if (prevSets && prevSets.length > 0) {
+            const prevSet = prevSets[index] || prevSets[prevSets.length - 1];
+            weight = prevSet.weight;
+            reps = prevSet.reps;
+          }
+          return {
+            weight: weight,
+            reps: reps,
+            completed: false,
+            type: s.type || 'normal'
+          };
+        })
       };
     });
   }
