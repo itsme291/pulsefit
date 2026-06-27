@@ -479,6 +479,9 @@ function switchTab(tabId) {
     } else if (tabId === 'tab-nutrition') {
       pageTitle.textContent = 'Nutrition & Macros';
       renderNutritionTab();
+    } else if (tabId === 'tab-cardio') {
+      pageTitle.textContent = 'Cardio & GPS Tracker';
+      initCardioMap();
     }
   }
 }
@@ -558,6 +561,330 @@ function setWeightUnit(unit) {
     renderActiveWorkoutExercises();
   }
 }
+
+// Initialize active routine on load if exists
+if (activeWorkout) {
+  renderActiveWorkoutExercises();
+}
+
+// ==========================================================================
+// Cardio / GPS Tracking Module
+// ==========================================================================
+
+let cardioWatchId = null;
+let cardioWakeLock = null;
+let cardioMap = null;
+let cardioPolyline = null;
+let cardioPathLatLngs = [];
+let cardioStartTime = null;
+let cardioTotalSeconds = 0;
+let cardioTotalMiles = 0;
+let cardioState = 'idle'; // 'idle', 'running', 'paused'
+let cardioTimerInterval = null;
+let cardioUnit = 'mi'; // 'mi' or 'km'
+let lockScreenHoldTimer = null;
+
+function initCardioUI() {
+  document.getElementById('btn-start-cardio').addEventListener('click', startCardioTracking);
+  document.getElementById('btn-pause-cardio').addEventListener('click', pauseCardioTracking);
+  document.getElementById('btn-resume-cardio').addEventListener('click', resumeCardioTracking);
+  document.getElementById('btn-finish-cardio').addEventListener('click', finishCardioTracking);
+  
+  document.getElementById('btn-lock-screen').addEventListener('click', activateLockScreen);
+  
+  const holdBtn = document.getElementById('unlock-hold-btn');
+  holdBtn.addEventListener('mousedown', startUnlockHold);
+  holdBtn.addEventListener('mouseup', cancelUnlockHold);
+  holdBtn.addEventListener('mouseleave', cancelUnlockHold);
+  holdBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startUnlockHold(); }, {passive: false});
+  holdBtn.addEventListener('touchend', cancelUnlockHold);
+  holdBtn.addEventListener('touchcancel', cancelUnlockHold);
+  
+  document.getElementById('cardio-unit-toggle').addEventListener('click', toggleCardioUnit);
+}
+
+function toggleCardioUnit() {
+  cardioUnit = cardioUnit === 'mi' ? 'km' : 'mi';
+  document.getElementById('cardio-unit-label').textContent = cardioUnit;
+  updateCardioUI();
+}
+
+function initCardioMap() {
+  if (cardioMap) {
+    setTimeout(() => cardioMap.invalidateSize(), 200);
+    return;
+  }
+  
+  if (typeof L === 'undefined') return;
+  
+  cardioMap = L.map('cardio-map', {
+    zoomControl: false
+  }).setView([0, 0], 2);
+  
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap',
+    subdomains: 'abcd',
+    maxZoom: 20
+  }).addTo(cardioMap);
+  
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      cardioMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+    });
+  }
+}
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      cardioWakeLock = await navigator.wakeLock.request('screen');
+      cardioWakeLock.addEventListener('release', () => {
+        console.log('Screen Wake Lock released');
+      });
+      console.log('Screen Wake Lock active');
+    }
+  } catch (err) {
+    console.error(`Wake Lock error: ${err.name}, ${err.message}`);
+  }
+}
+
+function releaseWakeLock() {
+  if (cardioWakeLock !== null) {
+    cardioWakeLock.release();
+    cardioWakeLock = null;
+  }
+}
+
+function startCardioTracking() {
+  cardioState = 'running';
+  cardioTotalSeconds = 0;
+  cardioTotalMiles = 0;
+  cardioPathLatLngs = [];
+  cardioStartTime = Date.now();
+  
+  if (cardioPolyline) cardioPolyline.remove();
+  cardioPolyline = L.polyline([], {color: '#ef4444', weight: 4}).addTo(cardioMap);
+  
+  requestWakeLock();
+  
+  document.getElementById('btn-start-cardio').classList.add('hidden');
+  document.getElementById('cardio-active-controls').classList.remove('hidden');
+  document.getElementById('btn-lock-screen').classList.remove('hidden');
+  
+  startCardioTimer();
+  startGPSWatch();
+}
+
+function pauseCardioTracking() {
+  cardioState = 'paused';
+  stopCardioTimer();
+  if (cardioWatchId) navigator.geolocation.clearWatch(cardioWatchId);
+  releaseWakeLock();
+  
+  document.getElementById('btn-pause-cardio').classList.add('hidden');
+  document.getElementById('btn-resume-cardio').classList.remove('hidden');
+  document.getElementById('btn-lock-screen').classList.add('hidden');
+}
+
+function resumeCardioTracking() {
+  cardioState = 'running';
+  cardioStartTime = Date.now() - (cardioTotalSeconds * 1000);
+  
+  requestWakeLock();
+  startCardioTimer();
+  startGPSWatch();
+  
+  document.getElementById('btn-resume-cardio').classList.add('hidden');
+  document.getElementById('btn-pause-cardio').classList.remove('hidden');
+  document.getElementById('btn-lock-screen').classList.remove('hidden');
+}
+
+function finishCardioTracking() {
+  if (!confirm('Are you sure you want to finish this workout?')) return;
+  
+  cardioState = 'idle';
+  stopCardioTimer();
+  if (cardioWatchId) navigator.geolocation.clearWatch(cardioWatchId);
+  releaseWakeLock();
+  
+  document.getElementById('btn-start-cardio').classList.remove('hidden');
+  document.getElementById('cardio-active-controls').classList.add('hidden');
+  document.getElementById('btn-resume-cardio').classList.add('hidden');
+  document.getElementById('btn-lock-screen').classList.add('hidden');
+  
+  saveCardioWorkout();
+}
+
+function startCardioTimer() {
+  if (cardioTimerInterval) clearInterval(cardioTimerInterval);
+  
+  cardioTimerInterval = setInterval(() => {
+    if (cardioState === 'running') {
+      const elapsedMs = Date.now() - cardioStartTime;
+      cardioTotalSeconds = Math.floor(elapsedMs / 1000);
+      updateCardioUI();
+    }
+  }, 1000);
+}
+
+function stopCardioTimer() {
+  if (cardioTimerInterval) {
+    clearInterval(cardioTimerInterval);
+    cardioTimerInterval = null;
+  }
+}
+
+function startGPSWatch() {
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+  
+  cardioWatchId = navigator.geolocation.watchPosition(
+    position => {
+      if (cardioState !== 'running') return;
+      
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const acc = position.coords.accuracy;
+      
+      if (acc > 30) return;
+      
+      const newLatLng = [lat, lng];
+      
+      if (cardioPathLatLngs.length > 0) {
+        const prevLatLng = cardioPathLatLngs[cardioPathLatLngs.length - 1];
+        const distMiles = calculateHaversineDistance(prevLatLng[0], prevLatLng[1], lat, lng);
+        cardioTotalMiles += distMiles;
+      }
+      
+      cardioPathLatLngs.push(newLatLng);
+      cardioPolyline.addLatLng(newLatLng);
+      cardioMap.setView(newLatLng, 17);
+      
+      updateCardioUI();
+    },
+    error => {
+      console.error("GPS Error: ", error);
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+  );
+}
+
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+  const R = 3958.8;
+  const dLat = (lat2 - lat1) * (Math.PI/180);
+  const dLon = (lon2 - lon1) * (Math.PI/180);
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * (Math.PI/180)) * Math.cos(lat2 * (Math.PI/180)) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+  return R * c; 
+}
+
+function updateCardioUI() {
+  const hrs = Math.floor(cardioTotalSeconds / 3600);
+  const mins = Math.floor((cardioTotalSeconds % 3600) / 60);
+  const secs = cardioTotalSeconds % 60;
+  
+  const timeStr = hrs > 0 
+    ? `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    : `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  
+  let displayDist = cardioTotalMiles;
+  if (cardioUnit === 'km') {
+    displayDist = cardioTotalMiles * 1.60934;
+  }
+  const distStr = displayDist.toFixed(2);
+  
+  let paceStr = '--:--';
+  if (displayDist > 0.01 && cardioTotalSeconds > 0) {
+    const totalMinutes = cardioTotalSeconds / 60;
+    const paceDecimal = totalMinutes / displayDist;
+    const paceMins = Math.floor(paceDecimal);
+    const paceSecs = Math.floor((paceDecimal - paceMins) * 60);
+    paceStr = `${paceMins}:${paceSecs.toString().padStart(2, '0')}`;
+  }
+  
+  document.getElementById('cardio-time').textContent = timeStr;
+  document.getElementById('cardio-distance').textContent = distStr;
+  document.getElementById('cardio-pace').textContent = paceStr;
+  
+  document.getElementById('lock-time').textContent = timeStr;
+  document.getElementById('lock-distance').textContent = distStr;
+}
+
+function activateLockScreen() {
+  document.getElementById('software-lock-screen').classList.remove('hidden');
+}
+
+function startUnlockHold(e) {
+  const fill = document.getElementById('unlock-progress-fill');
+  fill.style.transition = 'width 3s linear';
+  fill.style.width = '100%';
+  
+  lockScreenHoldTimer = setTimeout(() => {
+    document.getElementById('software-lock-screen').classList.add('hidden');
+    fill.style.transition = 'none';
+    fill.style.width = '0%';
+  }, 3000);
+}
+
+function cancelUnlockHold(e) {
+  if (lockScreenHoldTimer) {
+    clearTimeout(lockScreenHoldTimer);
+    lockScreenHoldTimer = null;
+  }
+  const fill = document.getElementById('unlock-progress-fill');
+  fill.style.transition = 'width 0.3s ease';
+  fill.style.width = '0%';
+}
+
+function saveCardioWorkout() {
+  if (typeof saveCardioToGoogleDrive !== 'function') {
+    alert("Google Drive syncing not available right now.");
+    return;
+  }
+  
+  let displayDist = cardioTotalMiles;
+  if (cardioUnit === 'km') {
+    displayDist = cardioTotalMiles * 1.60934;
+  }
+  
+  const totalMinutes = cardioTotalSeconds / 60;
+  let paceDecimal = displayDist > 0 ? totalMinutes / displayDist : 0;
+  let paceMins = Math.floor(paceDecimal);
+  let paceSecs = Math.floor((paceDecimal - paceMins) * 60);
+  let paceStr = `${paceMins}:${paceSecs.toString().padStart(2, '0')} / ${cardioUnit}`;
+  
+  const payload = {
+    id: 'cardio_' + Date.now(),
+    name: 'Outdoor Run',
+    date: new Date().toISOString(),
+    durationSeconds: cardioTotalSeconds,
+    distance: displayDist.toFixed(2),
+    distanceUnit: cardioUnit,
+    pace: paceStr,
+    path: cardioPathLatLngs
+  };
+  
+  saveCardioToGoogleDrive(payload);
+  
+  document.getElementById('cardio-time').textContent = '00:00:00';
+  document.getElementById('cardio-distance').textContent = '0.00';
+  document.getElementById('cardio-pace').textContent = '--:--';
+  cardioTotalSeconds = 0;
+  cardioTotalMiles = 0;
+  cardioPathLatLngs = [];
+  if (cardioPolyline) cardioPolyline.remove();
+  
+  switchTab('tab-history');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  initCardioUI();
+});
 
 // Backup & Recovery
 function exportData() {

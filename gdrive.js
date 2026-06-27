@@ -1354,4 +1354,143 @@ async function syncEverythingNow() {
   }
 }
 
+// ==========================================================================
+// Cardio / GPS Log Syncing
+// ==========================================================================
 
+function formatCardioForFile(cardio) {
+  const dateStr = new Date(cardio.date).toLocaleDateString(undefined, {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  });
+  const durationMins = Math.round(cardio.durationSeconds / 60);
+  
+  let log = `==================================================\n`;
+  log += `Workout Date: ${dateStr}\n`;
+  log += `Workout Name: ${cardio.name}\n`;
+  log += `Duration: ${durationMins} minutes\n`;
+  log += `Distance: ${cardio.distance} ${cardio.distanceUnit}\n`;
+  log += `Average Pace: ${cardio.pace}\n`;
+  log += `==================================================\n`;
+  return log;
+}
+
+async function saveCardioToGoogleDrive(cardio) {
+  if (!isGDriveConnected()) {
+    console.warn('Google Drive not connected. Cannot save cardio log.');
+    return false;
+  }
+  
+  updateGDriveStatus('syncing');
+  
+  try {
+    if (typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: gdriveAccessToken });
+    }
+    const folderName = (settings.googleFolder || 'Pulsefit').trim();
+    const folderId = await getOrCreateFolder(folderName);
+    
+    // 1. Google Doc (PulseFit_Workout_Log)
+    const searchDocResponse = await gapi.client.drive.files.list({
+      q: `name = 'PulseFit_Workout_Log' and mimeType = 'application/vnd.google-apps.document' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    const docFiles = searchDocResponse.result.files;
+    const newLogEntry = formatCardioForFile(cardio);
+    
+    if (docFiles && docFiles.length > 0) {
+      await prependWorkoutLog(docFiles[0].id, newLogEntry);
+    } else {
+      const createResponse = await gapi.client.drive.files.create({
+        resource: { name: 'PulseFit_Workout_Log', mimeType: 'application/vnd.google-apps.document', parents: [folderId] },
+        fields: 'id'
+      });
+      const fileHeader = `PULSEFIT WORKOUT DATABASE\n=========================\nThis document stores your logged workouts. Your Gemini AI Workspace extension reads this file to analyze details.\n\n`;
+      await appendDocContent(createResponse.result.id, fileHeader + newLogEntry);
+    }
+    
+    // 2. Google Sheet (PulseFit_Workout_Log_Sheet)
+    const searchSheetResponse = await gapi.client.drive.files.list({
+      q: `name = 'PulseFit_Workout_Log_Sheet' and mimeType = 'application/vnd.google-apps.spreadsheet' and '${folderId}' in parents and trashed = false`,
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+    
+    let sheetId = null;
+    const sheetFiles = searchSheetResponse.result.files;
+    
+    if (sheetFiles && sheetFiles.length > 0) {
+      sheetId = sheetFiles[0].id;
+    } else {
+      const createResponse = await gapi.client.sheets.spreadsheets.create({
+        resource: {
+          properties: { title: 'PulseFit_Workout_Log_Sheet' },
+          sheets: [
+            { properties: { title: "Workouts" } },
+            { properties: { title: "Cardio" } }
+          ]
+        }
+      });
+      sheetId = createResponse.result.spreadsheetId;
+      
+      // Move spreadsheet to folder
+      await gapi.client.drive.files.update({
+        fileId: sheetId,
+        addParents: folderId,
+        fields: 'id, parents'
+      });
+      
+      // Setup headers for Cardio sheet
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: 'Cardio!A1:F1',
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [["Date", "Name", "Duration (Sec)", "Distance", "Unit", "Pace"]] }
+      });
+    }
+    
+    // Check if Cardio sheet exists, add if missing
+    const sheetMeta = await gapi.client.sheets.spreadsheets.get({ spreadsheetId: sheetId });
+    const hasCardioSheet = sheetMeta.result.sheets.some(s => s.properties.title === 'Cardio');
+    
+    if (!hasCardioSheet) {
+      await gapi.client.sheets.spreadsheets.batchUpdate({
+        spreadsheetId: sheetId,
+        resource: { requests: [{ addSheet: { properties: { title: "Cardio" } } }] }
+      });
+      await gapi.client.sheets.spreadsheets.values.update({
+        spreadsheetId: sheetId,
+        range: 'Cardio!A1:F1',
+        valueInputOption: 'USER_ENTERED',
+        resource: { values: [["Date", "Name", "Duration (Sec)", "Distance", "Unit", "Pace"]] }
+      });
+    }
+    
+    // Append row
+    const rowData = [
+      new Date(cardio.date).toLocaleString(),
+      cardio.name,
+      cardio.durationSeconds,
+      cardio.distance,
+      cardio.distanceUnit,
+      cardio.pace
+    ];
+    
+    await gapi.client.sheets.spreadsheets.values.append({
+      spreadsheetId: sheetId,
+      range: 'Cardio!A:F',
+      valueInputOption: 'USER_ENTERED',
+      insertDataOption: 'INSERT_ROWS',
+      resource: { values: [rowData] }
+    });
+    
+    console.log('Cardio successfully synced to Google Drive!');
+    return true;
+  } catch (err) {
+    console.error('Google Drive Cardio Sync Error:', err);
+    return false;
+  } finally {
+    updateGDriveStatus('connected');
+  }
+}

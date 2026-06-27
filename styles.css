@@ -2658,3 +2658,201 @@ body {
   min-width: unset !important;
 }
 
+/* ==========================================================================
+   Cardio Tracking Dashboard
+   ========================================================================== */
+
+.cardio-dashboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 20px;
+  padding-bottom: 20px;
+}
+
+.cardio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardio-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  border: 1px solid var(--border-color);
+}
+
+.stat-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.stat-box.primary .stat-value {
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-around;
+  border-top: 1px solid var(--border-color);
+  padding-top: 16px;
+  margin-top: 4px;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 1px;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.cardio-map-container {
+  flex-grow: 1;
+  min-height: 250px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.cardio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ==========================================================================
+   Software Lock Screen
+   ========================================================================== */
+
+#software-lock-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: opacity 0.3s;
+}
+
+#software-lock-screen.hidden {
+  display: none !important;
+}
+
+.lock-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 300px;
+}
+
+.lock-icon-container {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.lock-icon-container i {
+  width: 32px;
+  height: 32px;
+  color: #fff;
+}
+
+.lock-screen-content h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.lock-screen-content p {
+  color: #aaa;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 8px;
+  margin-bottom: 40px;
+}
+
+.cardio-stats-mini {
+  display: flex;
+  width: 100%;
+  justify-content: space-around;
+  margin-bottom: 60px;
+}
+
+.stat-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-mini .stat-label {
+  color: #888;
+  font-size: 12px;
+}
+
+.stat-mini .stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hold to unlock button */
+.hold-to-unlock-btn {
+  position: relative;
+  width: 100%;
+  height: 56px;
+  border-radius: 28px;
+  background: rgba(255,255,255,0.1);
+  border: 2px solid rgba(255,255,255,0.2);
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.unlock-text {
+  position: relative;
+  z-index: 2;
+}
+
+.unlock-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: var(--primary);
+  z-index: 1;
+}

@@ -17,7 +17,11 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=33">
+  
+  <!-- Leaflet Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   
   <!-- Google APIs and Identity Services (GIS) -->
   <script src="https://apis.google.com/js/api.js"></script>
@@ -58,6 +62,10 @@
         <button class="nav-item" data-tab="tab-nutrition" id="nav-nutrition">
           <i data-lucide="apple"></i>
           <span>Nutrition</span>
+        </button>
+        <button class="nav-item" data-tab="tab-cardio" id="nav-cardio">
+          <i data-lucide="map-pin"></i>
+          <span>Cardio / Run</span>
         </button>
         <button class="nav-item" data-tab="tab-coach" id="nav-coach">
           <i data-lucide="sparkles"></i>
@@ -453,6 +461,52 @@
           </div>
         </section>
         
+        <!-- Cardio / GPS Tracker Tab -->
+        <section class="tab-pane" id="tab-cardio">
+          <div class="cardio-dashboard">
+            <div class="cardio-header">
+              <h2>Run / Cycle</h2>
+              <button id="cardio-unit-toggle" class="btn btn-outline-secondary btn-sm" title="Toggle Miles/Km">
+                <i data-lucide="arrow-left-right"></i> <span id="cardio-unit-label">mi</span>
+              </button>
+            </div>
+            
+            <div class="cardio-stats">
+              <div class="stat-box primary">
+                <span class="stat-label">DISTANCE</span>
+                <span class="stat-value" id="cardio-distance">0.00</span>
+              </div>
+              <div class="stat-row">
+                <div class="stat-box">
+                  <span class="stat-label">TIME</span>
+                  <span class="stat-value" id="cardio-time">00:00:00</span>
+                </div>
+                <div class="stat-box">
+                  <span class="stat-label">PACE</span>
+                  <span class="stat-value" id="cardio-pace">--:--</span>
+                </div>
+              </div>
+            </div>
+            
+            <div id="cardio-map" class="cardio-map-container"></div>
+            
+            <div class="cardio-controls">
+              <button id="btn-start-cardio" class="btn btn-primary btn-large" style="width: 100%; height: 56px; font-size: 18px; font-weight: 700; border-radius: 28px;">START RUN</button>
+              
+              <div id="cardio-active-controls" class="hidden" style="display: flex; gap: 12px; width: 100%; margin-top: 12px;">
+                <button id="btn-pause-cardio" class="btn btn-outline-secondary" style="flex: 1; height: 56px; font-weight: 700; border-radius: 28px;">PAUSE</button>
+                <button id="btn-finish-cardio" class="btn btn-danger" style="flex: 1; height: 56px; font-weight: 700; border-radius: 28px;">FINISH</button>
+              </div>
+              
+              <button id="btn-resume-cardio" class="btn btn-primary hidden" style="width: 100%; height: 56px; font-weight: 700; border-radius: 28px; margin-top: 12px;">RESUME</button>
+              
+              <button id="btn-lock-screen" class="btn btn-secondary-text hidden" style="width: 100%; margin-top: 16px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <i data-lucide="lock"></i> Lock Screen (Pocket Mode)
+              </button>
+            </div>
+          </div>
+        </section>
+        
       </div>
     </main>
     
@@ -797,6 +851,32 @@
           <span>Request Access</span>
         </a>
       </div>
+    </div>
+  </div>
+  <!-- Software Lock Screen -->
+  <div id="software-lock-screen" class="hidden">
+    <div class="lock-screen-content">
+      <div class="lock-icon-container">
+        <i data-lucide="lock"></i>
+      </div>
+      <h2>Tracker Locked</h2>
+      <p>GPS and map are running in the background.</p>
+      
+      <div class="cardio-stats-mini">
+        <div class="stat-mini">
+          <span class="stat-label">DIST</span>
+          <span class="stat-value" id="lock-distance">0.00</span>
+        </div>
+        <div class="stat-mini">
+          <span class="stat-label">TIME</span>
+          <span class="stat-value" id="lock-time">00:00</span>
+        </div>
+      </div>
+      
+      <button id="unlock-hold-btn" class="hold-to-unlock-btn">
+        <span class="unlock-text">Hold to Unlock</span>
+        <div class="unlock-progress" id="unlock-progress-fill"></div>
+      </button>
     </div>
   </div>
 
