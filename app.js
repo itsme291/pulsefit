@@ -3134,8 +3134,6 @@ function connectAccessGateGoogle() {
     return;
   }
 
-  showAccessGateState('verifying');
-
   try {
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: settings.googleClientId,
@@ -3167,7 +3165,12 @@ function connectAccessGateGoogle() {
       }
     });
 
+    // Request the token IMMEDIATELY to preserve the user-gesture context for mobile browsers
     tokenClient.requestAccessToken({ prompt: 'consent' });
+    
+    // Now manipulate the DOM UI safely
+    showAccessGateState('verifying');
+    
   } catch (err) {
     console.error('Access Sign In Error:', err);
     showAccessGateState('error', '', err.message || err);

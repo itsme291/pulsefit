@@ -166,8 +166,6 @@ function connectGoogleDrive() {
     return;
   }
   
-  updateGDriveStatus('connecting');
-  
   try {
     // Initialize token client with user's client ID
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -213,9 +211,11 @@ function connectGoogleDrive() {
         alert('Error initializing Google Sign-in popup. Verify your Client ID and origins.');
       }
     });
-    
-    // Request access token (opens popup)
+    // Request access token (opens popup) IMMEDIATELY before UI changes
     tokenClient.requestAccessToken({ prompt: 'consent' });
+    
+    // Now update UI
+    updateGDriveStatus('connecting');
     
   } catch (err) {
     updateGDriveStatus('disconnected');
