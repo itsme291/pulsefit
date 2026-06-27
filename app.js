@@ -3108,6 +3108,11 @@ async function verifyUserAccess(token) {
       const overlay = document.getElementById('access-overlay');
       if (overlay) overlay.classList.add('hidden');
       console.log(`Access Granted for user: ${email}`);
+      
+      // Since the access gate already requests Drive scopes, the Drive is now connected!
+      if (typeof updateGDriveStatus === 'function') {
+        updateGDriveStatus('connected');
+      }
     } else if (found) {
       // Found but status not approved (e.g. pending)
       showAccessGateState('pending', email);
