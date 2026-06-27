@@ -89,6 +89,7 @@ let workoutTimerInterval = null;
 let restTimerInterval = null;
 let restTimerTotalSeconds = 0;
 let restTimerSecondsRemaining = 0;
+let restTimerTargetTimestamp = 0;
 let analyticsChart = null;
 
 // ==========================================================================
@@ -1142,10 +1143,9 @@ function finishActiveWorkout() {
 function startRestTimer(seconds) {
   restTimerTotalSeconds = seconds;
   restTimerSecondsRemaining = seconds;
+  restTimerTargetTimestamp = Date.now() + (seconds * 1000);
   
   const timerOverlay = document.getElementById('floating-timer');
-  const digits = document.getElementById('timer-digits');
-  const progressBar = document.getElementById('timer-progress-bar');
   
   timerOverlay.classList.remove('hidden');
   updateRestTimerUI();
@@ -1153,7 +1153,10 @@ function startRestTimer(seconds) {
   if (restTimerInterval) clearInterval(restTimerInterval);
   
   restTimerInterval = setInterval(() => {
-    restTimerSecondsRemaining--;
+    const now = Date.now();
+    const remainingMs = restTimerTargetTimestamp - now;
+    
+    restTimerSecondsRemaining = Math.max(0, Math.ceil(remainingMs / 1000));
     updateRestTimerUI();
     
     if (restTimerSecondsRemaining <= 0) {
@@ -1177,14 +1180,22 @@ function updateRestTimerUI() {
 }
 
 function adjustRestTimer(seconds) {
-  restTimerSecondsRemaining += seconds;
-  if (restTimerSecondsRemaining < 0) restTimerSecondsRemaining = 0;
+  restTimerTargetTimestamp += (seconds * 1000);
   
-  // If we increased beyond the initial total, update total to keep progress bar clean
+  const now = Date.now();
+  restTimerSecondsRemaining = Math.max(0, Math.ceil((restTimerTargetTimestamp - now) / 1000));
+  
   if (restTimerSecondsRemaining > restTimerTotalSeconds) {
     restTimerTotalSeconds = restTimerSecondsRemaining;
   }
+  
   updateRestTimerUI();
+  
+  if (restTimerSecondsRemaining <= 0) {
+    if (restTimerInterval) clearInterval(restTimerInterval);
+    playTimerAlertSound();
+    document.getElementById('floating-timer').classList.add('hidden');
+  }
 }
 
 function skipRestTimer() {
