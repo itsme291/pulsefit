@@ -656,6 +656,11 @@ function releaseWakeLock() {
 }
 
 function startCardioTracking() {
+  if (!localStorage.getItem('pulsefit_cardio_warning_shown')) {
+    alert("IMPORTANT: DO NOT lock your phone with the physical power button!\n\nMobile browsers pause GPS when the screen is off. Instead, tap the 'Lock Screen' button below to safely put the phone in your pocket while keeping GPS 100% active.");
+    localStorage.setItem('pulsefit_cardio_warning_shown', 'true');
+  }
+
   cardioState = 'running';
   cardioTotalSeconds = 0;
   cardioTotalMiles = 0;
@@ -884,6 +889,12 @@ function saveCardioWorkout() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initCardioUI();
+  
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && cardioState === 'running') {
+      alert('WARNING: You just woke up your phone or returned to Chrome!\n\nYour phone paused the GPS while you were gone, meaning it only measured a straight line from your last location.\n\nNext time, leave your screen ON and use the pitch-black "Lock Screen" button in the app instead of your physical power button!');
+    }
+  });
 });
 
 // Backup & Recovery
